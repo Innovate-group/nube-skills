@@ -15,6 +15,7 @@ Objetivo: un repo público en GitHub (`Innovate-group/nube-skills`) con skills y
 - **Visibilidad:** público desde el día uno. Contenido escrito para público: sin nombres de clientes, tokens ni URLs internas.
 - **Idioma:** español (comunidad Tienda Nube = LatAm; la doc oficial está en es-AR). Descriptions de frontmatter con triggers bilingües.
 - **Rediseños mixtos:** la skill Figma→section hace triage por nodo: re-estilizar/configurar una section de Ipanema cuando alcanza, crear section/block custom cuando el diseño difiere estructuralmente.
+- **Convención de nombres (agregada 2026-08-18):** toda skill del catálogo se llama `nube-skills-<qué-hace>` (ej. `nube-skills-themes`); los comandos usan el namespace del plugin (`/nube-skills:<comando>`).
 
 ## Layout del repo
 
@@ -52,11 +53,11 @@ npx skills add Innovate-group/nube-skills
 
 | Orden | Pieza | Tipo | Descripción |
 |---|---|---|---|
-| 1 | `tiendanube-sectionable-themes` | skill (ya construida) | Fundación de contexto: modelo sectionable, Fork Workflow, detección de generación de tema, referencias de la doc oficial. Migra tal cual desde `~/.claude/skills/`. Las demás piezas la referencian en vez de duplicar doc. |
-| 2 | `tiendanube-figma-section` | skill (core) | Input: nodo(s) Figma desktop+mobile. Extrae design context y screenshot vía MCP de Figma; **triage** (¿re-estilizar section de Ipanema o crear custom?); genera section/block `.tpl` con `{% schema %}`, claves `t:` en todos los locales, entrada en el JSON template. Aplica las reglas duras de la skill 1. |
+| 1 | `nube-skills-themes` | skill (ya construida) | Fundación de contexto: modelo sectionable, Fork Workflow, detección de generación de tema, referencias de la doc oficial. Migra desde `~/.claude/skills/tiendanube-sectionable-themes` (renombrada). Las demás piezas la referencian en vez de duplicar doc. |
+| 2 | `nube-skills-figma-section` | skill (core) | Input: nodo(s) Figma desktop+mobile. Extrae design context y screenshot vía MCP de Figma; **triage** (¿re-estilizar section de Ipanema o crear custom?); genera section/block `.tpl` con `{% schema %}`, claves `t:` en todos los locales, entrada en el JSON template. Aplica las reglas duras de la skill 1. |
 | 3 | `/nube-skills:kickoff` | comando | Arranque de cliente: `theme create --base-theme ipanema` o clone, `pull`, git init con `.gitignore` correcto (`.nuvem`), CLAUDE.md del proyecto, checklist inicial. |
-| 4 | `tiendanube-i18n` | skill | Audita y completa traducciones: claves `t:` y `\| t` usadas pero faltantes en algún `<locale>.json` / `<locale>.schema.json`; alta en todos los locales respetando fallback. |
-| 5 | `tiendanube-theme-qa` | skill | QA visual: preview del tema (`?theme_installation_id`) + screenshots desktop/mobile con MCP de Chrome DevTools, comparación contra los nodos Figma, reporte de diferencias (adapta el enfoque de design-compare al flujo TN). |
+| 4 | `nube-skills-i18n` | skill | Audita y completa traducciones: claves `t:` y `\| t` usadas pero faltantes en algún `<locale>.json` / `<locale>.schema.json`; alta en todos los locales respetando fallback. |
+| 5 | `nube-skills-qa` | skill | QA visual: preview del tema (`?theme_installation_id`) + screenshots desktop/mobile con MCP de Chrome DevTools, comparación contra los nodos Figma, reporte de diferencias (adapta el enfoque de design-compare al flujo TN). |
 
 Excluido a propósito (YAGNI): comando de deploy/publish, skill de performance (`theme performance` ya existe en el CLI), wrapper de comando para la pieza 2.
 

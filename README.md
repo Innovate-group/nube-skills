@@ -21,11 +21,13 @@ npx skills add Innovate-group/nube-skills
 
 | Pieza | Tipo | Estado | Descripción |
 |---|---|---|---|
-| `tiendanube-sectionable-themes` | skill | ✅ disponible | Contexto completo del modelo sectionable: arquitectura, sections/blocks/snippets, schema, CLI y Fork Workflow, con detección automática de generación de tema (nuevo / clásico / Shopify). |
-| `tiendanube-figma-section` | skill | 🔜 en camino | De un nodo de Figma (desktop + mobile) a una section/block de Ipanema: triage re-estilizar vs. custom, `.tpl` + `{% schema %}` + traducciones + JSON template. |
+| `nube-skills-themes` | skill | ✅ disponible | Contexto completo del modelo sectionable: arquitectura, sections/blocks/snippets, schema, CLI y Fork Workflow, con detección automática de generación de tema (nuevo / clásico / Shopify). |
+| `nube-skills-figma-section` | skill | 🔜 en camino | De un nodo de Figma (desktop + mobile) a una section/block de Ipanema: triage re-estilizar vs. custom, `.tpl` + `{% schema %}` + traducciones + JSON template. |
 | `/nube-skills:kickoff` | comando | 🔜 en camino | Arranque de un cliente nuevo: instalación Ipanema con el CLI, pull, git y checklist. |
-| `tiendanube-i18n` | skill | 🔜 en camino | Auditoría y alta de claves de traducción en todos los locales. |
-| `tiendanube-theme-qa` | skill | 🔜 en camino | QA visual de la implementación contra el boceto de Figma (desktop y mobile). |
+| `nube-skills-i18n` | skill | 🔜 en camino | Auditoría y alta de claves de traducción en todos los locales. |
+| `nube-skills-qa` | skill | 🔜 en camino | QA visual de la implementación contra el boceto de Figma (desktop y mobile). |
+
+Convención de nombres: toda skill del catálogo se llama `nube-skills-<qué-hace>`; los comandos llevan el namespace del plugin (`/nube-skills:<comando>`).
 
 ## Requisitos
 

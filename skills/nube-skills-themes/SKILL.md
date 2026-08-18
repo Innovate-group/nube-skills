@@ -1,5 +1,5 @@
 ---
-name: tiendanube-sectionable-themes
+name: nube-skills-themes
 description: "Expert skill for TiendaNube/Nuvemshop NEW section-based themes (Fork Workflow, Ipanema base theme). Use when creating or modifying sections, blocks, snippets, JSON page templates (templates/pages/*.json), inline {% schema %} blocks, config/settings_schema.json, JSON translations, or when using the Tiendanube CLI (theme authorize/pull/push/watch/fork/publish/preview). Triggers: sectionable, tema seccionable, diseños basados en secciones, section-based theme, Ipanema, Fork Workflow, tiendanube CLI, {% schema %}, block_attributes, JSON template, theme watch, .nuvem, manifest.json. NOT for classic/legacy TiendaNube themes (config/settings.txt, snipplets/ — use tiendanube-theme-config or tiendanube-objects) and NOT for Shopify themes (.liquid — use shopify-liquid skills)."
 ---
 
