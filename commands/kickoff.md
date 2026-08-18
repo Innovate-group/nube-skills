@@ -1,6 +1,7 @@
 ---
 description: Arranca un proyecto nuevo de tema sectionable de Tienda Nube (Ipanema, Fork Workflow) — instalación, pull, git y CLAUDE.md del proyecto
 argument-hint: [nombre-del-cliente]
+disable-model-invocation: true
 ---
 
 Arrancá un proyecto nuevo de tema sectionable de Tienda Nube. Cliente: $ARGUMENTS
