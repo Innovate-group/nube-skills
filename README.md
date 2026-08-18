@@ -17,6 +17,15 @@ Skills y comandos de [Claude Code](https://claude.com/claude-code) para el desar
 npx skills add Innovate-group/nube-skills
 ```
 
+**Actualizar a la última versión** (cuando se anuncie un release):
+
+```bash
+claude plugin marketplace update nube-skills
+claude plugin update nube-skills@nube-skills
+```
+
+(reiniciar la sesión para que aplique; vía skills.sh: `npx skills update`)
+
 ## Catálogo
 
 | Pieza | Tipo | Estado | Descripción |
