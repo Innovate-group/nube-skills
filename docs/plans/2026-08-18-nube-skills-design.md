@@ -1,6 +1,6 @@
 # Diseño: nube-skills — skills y comandos de Claude Code para temas nuevos de Tienda Nube
 
-**Fecha:** 2026-08-18 · **Estado:** aprobado
+**Fecha:** 2026-08-18 · **Estado:** aprobado · **Catálogo completo en v1.0.0** (las 5 piezas publicadas)
 
 ## Contexto y objetivo
 

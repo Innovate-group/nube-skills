@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0 — 2026-08-18
+
+- Nueva skill `nube-skills-qa`: QA visual contra el diseño en desktop y mobile. Maneja la preview del tema con el MCP de Chrome DevTools (`emulate` para que DPR y touch evalúen bien las media queries), hace **QA numérico** leyendo estilos computados en vez de estimar píxeles, verifica estados interactivos con hover real y el toggle de visibilidad interna con contextos aislados, y reporta hallazgos priorizados distinguiendo bugs de código, settings mal configurados y contenido real de la tienda. No duplica performance (`theme performance` ya corre Lighthouse).
+- **Catálogo completo**: las 5 piezas del diseño original están publicadas.
+
 ## 0.7.0 — 2026-08-18
 
 - Nueva skill `nube-skills-i18n`: audita y completa traducciones. Distingue los dos sistemas independientes (claves `t:` del editor en `<locale>.schema.json` vs strings del comprador con `| t` en `<locale>.json`), detecta claves usadas en el código que faltan en algún locale, reporta huérfanas y pares de locale incompletos, y avisa cuando el proyecto no tiene fork (las traducciones no se pushean). Incluye `scripts/audit-i18n.py`, determinista y sin dependencias.
