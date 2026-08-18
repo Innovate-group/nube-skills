@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 2026-08-18
+
+- Nueva skill `nube-skills-figma-section`: convierte nodos de Figma (desktop + mobile) en código del tema con triage de intervención mínima (configurar / re-estilizar / extender / custom), filosofía settings-first, traducciones en todos los locales y registro en el JSON template. Requiere el MCP oficial de Figma.
+- Convenciones incluidas en la skill: chequeo obligatorio del ui-kit del proyecto (se pregunta y persiste su ubicación), settings de padding top/bottom para desktop y mobile en toda section generada, pregunta por estados interactivos (hover, etc.) y toggle opcional de visibilidad interna para usuarios `@innovategroup`.
+
 ## 0.2.0 — 2026-08-18
 
 - Convención de nombres del catálogo: toda skill pasa a llamarse `nube-skills-<qué-hace>`.

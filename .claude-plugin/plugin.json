@@ -1,6 +1,6 @@
 {
   "name": "nube-skills",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Skills y comandos de Claude Code para el desarrollo y mantenimiento de temas sectionable de Tienda Nube (Ipanema, Fork Workflow)",
   "author": { "name": "Innovate Group" }
 }
