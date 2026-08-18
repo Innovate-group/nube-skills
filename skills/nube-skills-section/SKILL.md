@@ -1,5 +1,5 @@
 ---
-name: nube-skills-figma-section
+name: nube-skills-section
 description: "Build sections, blocks and components for TiendaNube sectionable themes (Ipanema base), from a Figma design or from scratch. Use when the user provides a Figma link or node ('implementá esta sección del boceto', 'pasá este diseño a código') OR asks for a new section/block/component without any mockup ('necesito una sección de X', 'creá un bloque de Y') while working on a TiendaNube section-based theme: extracts the design via the Figma MCP — or drafts one first with the design skill when there is no mockup — triages whether to configure/restyle an existing section or build a custom one, and generates the .tpl with {% schema %}, settings-first values, translations in all locales, and registration in the page's JSON template. Triggers: figma to section, nodo de figma, crear sección/bloque/componente tienda nube, design-to-code, Ipanema. NOT for Shopify themes (.liquid) and NOT for classic TiendaNube .tpl themes (snipplets/, settings.txt — use the legacy tiendanube-* skills)."
 ---
 

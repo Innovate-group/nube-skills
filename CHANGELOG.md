@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 — 2026-08-18
+
+- Renombrada `nube-skills-figma-section` → **`nube-skills-section`**: la skill construye sections con o sin boceto de Figma, así que el nombre ya no la ata a Figma. Mismo contenido; referencias actualizadas en el comando `kickoff` y en el README.
+
 ## 0.5.0 — 2026-08-18
 
 - `nube-skills-figma-section`: nueva **Vía B** para cuando el dev no tiene boceto — en vez de codear a ojo, invoca la skill `design` para dibujar los artboards desktop y mobile con el ui-kit y los tokens reales del proyecto, los valida con el dev y recién entonces sigue el flujo normal (triage → código). La skill ahora también dispara ante pedidos sin diseño ("necesito una sección de X").
