@@ -1,0 +1,11 @@
+{
+  "name": "nube-skills",
+  "owner": { "name": "Innovate Group" },
+  "plugins": [
+    {
+      "name": "nube-skills",
+      "source": "./",
+      "description": "Skills y comandos para temas sectionable de Tienda Nube (Ipanema, Fork Workflow)"
+    }
+  ]
+}
