@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0 — 2026-08-18
+
+- Nueva skill `nube-skills-i18n`: audita y completa traducciones. Distingue los dos sistemas independientes (claves `t:` del editor en `<locale>.schema.json` vs strings del comprador con `| t` en `<locale>.json`), detecta claves usadas en el código que faltan en algún locale, reporta huérfanas y pares de locale incompletos, y avisa cuando el proyecto no tiene fork (las traducciones no se pushean). Incluye `scripts/audit-i18n.py`, determinista y sin dependencias.
+
 ## 0.6.0 — 2026-08-18
 
 - Renombrada `nube-skills-figma-section` → **`nube-skills-section`**: la skill construye sections con o sin boceto de Figma, así que el nombre ya no la ata a Figma. Mismo contenido; referencias actualizadas en el comando `kickoff` y en el README.

@@ -33,7 +33,7 @@ claude plugin update nube-skills@nube-skills
 | `nube-skills-themes` | skill | ✅ disponible | Contexto completo del modelo sectionable: arquitectura, sections/blocks/snippets, schema, CLI y Fork Workflow, con detección automática de generación de tema (nuevo / clásico / Shopify). |
 | `nube-skills-section` | skill | ✅ disponible | Construye sections, blocks y componentes: de un nodo de Figma (desktop + mobile) o, sin boceto, dibujando primero un mockup con la skill `design`. Hace triage (configurar / re-estilizar / extender / custom), es settings-first, y genera `.tpl` + `{% schema %}` + traducciones + registro en el JSON template. |
 | `/nube-skills:kickoff` | comando | ✅ disponible | Arranque de un cliente nuevo: instalación Ipanema con el CLI, pull, git con `.nuvem` protegido, y `CLAUDE.md` del proyecto (con el ui-kit que usan las demás skills). |
-| `nube-skills-i18n` | skill | 🔜 en camino | Auditoría y alta de claves de traducción en todos los locales. |
+| `nube-skills-i18n` | skill | ✅ disponible | Auditoría y alta de claves de traducción: detecta las usadas en el código que faltan en algún locale (el `t:` crudo que aparece en el editor), distingue los dos sistemas (`t:` de schema vs `\| t` de storefront) e incluye un script determinista de auditoría. |
 | `nube-skills-qa` | skill | 🔜 en camino | QA visual de la implementación contra el boceto de Figma (desktop y mobile). |
 
 Convención de nombres: toda skill del catálogo se llama `nube-skills-<qué-hace>`; los comandos llevan el namespace del plugin (`/nube-skills:<comando>`).
