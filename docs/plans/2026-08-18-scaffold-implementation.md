@@ -28,7 +28,7 @@
 **Interfaces:**
 - Produces: `plugin.json` con `name: "nube-skills"` y `version: "0.1.0"` (la Tarea 3 valida su JSON; el README de la Tarea 5 referencia el nombre `nube-skills@nube-skills`).
 
-- [ ] **Step 1: Crear `.claude-plugin/plugin.json`**
+- [x] **Step 1: Crear `.claude-plugin/plugin.json`**
 
 ```json
 {
@@ -39,7 +39,7 @@
 }
 ```
 
-- [ ] **Step 2: Crear `.claude-plugin/marketplace.json`**
+- [x] **Step 2: Crear `.claude-plugin/marketplace.json`**
 
 ```json
 {
@@ -55,7 +55,7 @@
 }
 ```
 
-- [ ] **Step 3: Crear `.gitignore`**
+- [x] **Step 3: Crear `.gitignore`**
 
 ```
 .DS_Store
@@ -63,12 +63,12 @@ __pycache__/
 *.pyc
 ```
 
-- [ ] **Step 4: Verificar que ambos JSON parsean**
+- [x] **Step 4: Verificar que ambos JSON parsean**
 
 Run: `python3 -m json.tool .claude-plugin/plugin.json > /dev/null && python3 -m json.tool .claude-plugin/marketplace.json > /dev/null && echo JSON-OK`
 Expected: `JSON-OK`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .claude-plugin .gitignore
@@ -86,16 +86,16 @@ git commit -m "feat: manifiestos de plugin y marketplace (nube-skills v0.1.0)"
 **Interfaces:**
 - Produces: `skills/<nombre>/SKILL.md` — el layout que la Tarea 3 valida y que ambos canales de instalación escanean.
 
-- [ ] **Step 1: Copiar la skill completa**
+- [x] **Step 1: Copiar la skill completa**
 
 Run: `cp -R /Users/tonchi/.claude/skills/tiendanube-sectionable-themes /Users/tonchi/Desktop/Innovate/nube-skills/skills/`
 
-- [ ] **Step 2: Verificar la copia (6 archivos, mismo contenido)**
+- [x] **Step 2: Verificar la copia (6 archivos, mismo contenido)**
 
 Run: `find skills/tiendanube-sectionable-themes -type f | sort && diff -r /Users/tonchi/.claude/skills/tiendanube-sectionable-themes skills/tiendanube-sectionable-themes && echo COPIA-OK`
 Expected: 6 rutas (SKILL.md + 5 references) y `COPIA-OK` (diff sin salida).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add skills/
@@ -113,7 +113,7 @@ git commit -m "feat: migra la skill tiendanube-sectionable-themes como primera p
 - Consumes: layout `skills/*/SKILL.md` (Tarea 2) y `.claude-plugin/*.json` (Tarea 1).
 - Produces: exit code 0 (OK) / 1 (falla) con detalle por stderr-stdout — lo consume el workflow de la Tarea 4.
 
-- [ ] **Step 1: Escribir `scripts/validate.py`** (stdlib only, sin pyyaml)
+- [x] **Step 1: Escribir `scripts/validate.py`** (stdlib only, sin pyyaml)
 
 ```python
 #!/usr/bin/env python3
@@ -185,12 +185,12 @@ if errors:
 print(f"OK: {len(skill_dirs)} skill(s) válidas y manifiestos correctos")
 ```
 
-- [ ] **Step 2: Correrlo sobre el repo (caso feliz)**
+- [x] **Step 2: Correrlo sobre el repo (caso feliz)**
 
 Run: `python3 scripts/validate.py`
 Expected: `OK: 1 skill(s) válidas y manifiestos correctos` y exit 0.
 
-- [ ] **Step 3: Verificar que detecta fallas (caso roto, en /tmp, sin tocar el repo)**
+- [x] **Step 3: Verificar que detecta fallas (caso roto, en /tmp, sin tocar el repo)**
 
 ```bash
 cp -R . /tmp/nube-skills-broken && rm /tmp/nube-skills-broken/skills/tiendanube-sectionable-themes/references/cli-workflow.md
@@ -200,7 +200,7 @@ rm -rf /tmp/nube-skills-broken
 
 Expected: `VALIDACIÓN FALLÓ:` con `referencia rota references/cli-workflow.md` y `exit=1`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scripts/validate.py
@@ -217,7 +217,7 @@ git commit -m "feat: validador de estructura de skills y manifiestos (stdlib onl
 **Interfaces:**
 - Consumes: `scripts/validate.py` (exit code).
 
-- [ ] **Step 1: Crear `.github/workflows/validate.yml`**
+- [x] **Step 1: Crear `.github/workflows/validate.yml`**
 
 ```yaml
 name: Validate skills
@@ -239,12 +239,12 @@ jobs:
         run: python3 scripts/validate.py
 ```
 
-- [ ] **Step 2: Lint local del YAML**
+- [x] **Step 2: Lint local del YAML**
 
 Run: `python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/validate.yml')); print('YAML-OK')" 2>/dev/null || npx --yes yaml-lint .github/workflows/validate.yml 2>/dev/null || echo "verificar YAML a ojo"`
 Expected: `YAML-OK` (o verificación manual si no hay pyyaml local — el Action real se verifica en la Tarea 6 Step 3).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .github/workflows/validate.yml
@@ -260,7 +260,7 @@ git commit -m "ci: valida skills y manifiestos en cada push y PR"
 - Create: `LICENSE`
 - Create: `CHANGELOG.md`
 
-- [ ] **Step 1: Crear `README.md`**
+- [x] **Step 1: Crear `README.md`**
 
 ```markdown
 # nube-skills
@@ -306,9 +306,9 @@ Cada skill vive en `skills/<nombre>/SKILL.md`. Antes de commitear: `python3 scri
 [MIT](LICENSE)
 ```
 
-- [ ] **Step 2: Crear `LICENSE`** (MIT, texto estándar completo con `Copyright (c) 2026 Innovate Group` en la línea de copyright)
+- [x] **Step 2: Crear `LICENSE`** (MIT, texto estándar completo con `Copyright (c) 2026 Innovate Group` en la línea de copyright)
 
-- [ ] **Step 3: Crear `CHANGELOG.md`**
+- [x] **Step 3: Crear `CHANGELOG.md`**
 
 ```markdown
 # Changelog
@@ -320,7 +320,7 @@ Cada skill vive en `skills/<nombre>/SKILL.md`. Antes de commitear: `python3 scri
 - Validador de estructura (`scripts/validate.py`) y CI en GitHub Actions.
 ```
 
-- [ ] **Step 4: Validar y commitear**
+- [x] **Step 4: Validar y commitear**
 
 Run: `python3 scripts/validate.py`
 Expected: `OK: 1 skill(s) válidas y manifiestos correctos`
@@ -337,7 +337,7 @@ git commit -m "docs: README (instalación dual-canal y catálogo), licencia MIT 
 **Files:**
 - (sin archivos nuevos — publicación)
 
-- [ ] **Step 1: Crear el repo en la org y pushear** ⚠️ *Acción pública e irreversible en la práctica — confirmar con el usuario antes de ejecutar.*
+- [x] **Step 1: Crear el repo en la org y pushear** ⚠️ *Acción pública e irreversible en la práctica — confirmar con el usuario antes de ejecutar.*
 
 ```bash
 cd /Users/tonchi/Desktop/Innovate/nube-skills
@@ -347,13 +347,13 @@ gh repo create Innovate-group/nube-skills --public --source . --push \
 
 Expected: URL `https://github.com/Innovate-group/nube-skills` y push de `main` exitoso.
 
-- [ ] **Step 2: Agregar topics para descubribilidad**
+- [x] **Step 2: Agregar topics para descubribilidad**
 
 ```bash
 gh repo edit Innovate-group/nube-skills --add-topic tiendanube --add-topic claude-code --add-topic agent-skills --add-topic nuvemshop
 ```
 
-- [ ] **Step 3: Verificar que el Action corrió verde**
+- [x] **Step 3: Verificar que el Action corrió verde** (completed success, 9s)
 
 Run: `gh run list --repo Innovate-group/nube-skills --limit 1`
 Expected: workflow `Validate skills` con estado `completed success` (esperar ~1 min si está `in_progress`).
@@ -362,12 +362,12 @@ Expected: workflow `Validate skills` con estado `completed success` (esperar ~1 
 
 ### Task 7: Verificar los dos canales de instalación
 
-- [ ] **Step 1: Canal skills.sh — listar sin instalar**
+- [x] **Step 1: Canal skills.sh — listar sin instalar** (Found 1 skill: tiendanube-sectionable-themes)
 
 Run: `npx --yes skills add Innovate-group/nube-skills --list`
 Expected: lista que incluye `tiendanube-sectionable-themes`. (Esto NO siembra el índice todavía; la instalación real de un miembro del equipo lo hará.)
 
-- [ ] **Step 2: Canal plugin — instalación real (interactivo, lo hace el usuario)**
+- [x] **Step 2: Canal plugin — instalación real** (hecha headless con `claude plugin marketplace add` + `claude plugin install`; v0.2.0 enabled, scope user)
 
 En una sesión interactiva de Claude Code:
 ```
@@ -385,7 +385,7 @@ Expected: se invoca la skill del plugin y su Paso 0 de detección se ejecuta pri
 
 ### Task 8: Limpieza post-verificación (solo tras Task 7 OK)
 
-- [ ] **Step 1: Borrar la copia personal duplicada**
+- [x] **Step 1: Borrar la copia personal duplicada**
 
 Run: `rm -rf /Users/tonchi/.claude/skills/tiendanube-sectionable-themes`
 (La versión canónica pasa a ser la del plugin.)
