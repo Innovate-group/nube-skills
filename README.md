@@ -1,6 +1,6 @@
 # nube-skills
 
-Skills y comandos de [Claude Code](https://claude.com/claude-code) para el desarrollo y mantenimiento de temas **sectionable** de [Tienda Nube](https://tiendanube.dev) (tema base Ipanema, Fork Workflow). Mantenido por [Innovate Group](https://github.com/Innovate-group).
+Skills y comandos de [Claude Code](https://claude.com/claude-code) para [Tienda Nube](https://tiendanube.dev): desarrollo y mantenimiento de temas **sectionable** (tema base Ipanema, Fork Workflow) y operación del **backoffice** vía Admin API. Mantenido por [Innovate Group](https://github.com/Innovate-group).
 
 ## Instalación
 

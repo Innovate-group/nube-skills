@@ -5,7 +5,7 @@
     {
       "name": "nube-skills",
       "source": "./",
-      "description": "Skills y comandos para temas sectionable de Tienda Nube (Ipanema, Fork Workflow)"
+      "description": "Skills y comandos para Tienda Nube: temas sectionable (Ipanema, Fork Workflow) y backoffice (Admin API)"
     }
   ]
 }
