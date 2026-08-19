@@ -25,7 +25,7 @@ Hay tres brazos y se eligen en este orden: **MCP oficial** (si está conectado y
 
 | Área | MCP oficial | Script `tn-api.py` |
 |---|---|---|
-| Productos, variantes, stock y precios | ✅ CRUD, bulk de stock/precio (≤50 variantes) y de visibilidad (≤20) | ✅ todo, y sin los topes de la tool |
+| Productos, variantes, stock y precios | ✅ CRUD, bulk de stock/precio (≤50 variantes) y de visibilidad (≤20) | ✅ todo; el tope de 50 variantes es de la API, no de la tool: el script tampoco lo esquiva |
 | Categorías | ✅ | ✅ |
 | Cupones | ✅ | ✅ |
 | Promociones **nativas** | ✅ create / update / delete | ❌ **no hay REST pública** (ver [`no-se-puede.md`](no-se-puede.md) §5) |
@@ -67,22 +67,37 @@ ese usuario, no los de una app instalada.
 > foto, no un contrato.
 
 Dos límites que sí conviene recordar porque cambian el diseño de un lote: el bulk de stock/precio
-corta en **50 variantes** por llamada y el de visibilidad en **20 productos**. Un lote más grande se
-parte, y partirlo a mano en la conversación es peor que hacerlo con el script.
+corta en **50 variantes** por llamada —ese tope es de la API misma (`PATCH /products/stock-price`
+devuelve `422` si se pasa), así que el script lo arrastra igual— y el de visibilidad en **20
+productos**, ese sí propio de la tool. Un lote más grande se parte, y partirlo a mano en la
+conversación es peor que hacerlo con el script.
 
 ---
 
 ## 3. Credenciales para el script
 
-El token sale de una **app propia instalada en la tienda del cliente** (la modalidad de *installation
-link*, sin publicación en la App Store). El flujo completo está en
-[`api-map.md` §2](api-map.md#2-autenticación). Tres cosas que importan acá:
+Hay **dos vías** para conseguir el token, y conviene agotar la primera antes de armar nada:
+
+| Vía | Sirve cuando | Qué exige |
+|---|---|---|
+| **Aplicación a medida** | La tienda está en un plan que la habilita | Nada de nuestro lado: el merchant entra a *Aplicaciones a medida → Crear* en su propio admin, elige los scopes y copia el token. **Sin cuenta de partner, sin OAuth, sin homologación** |
+| **App de partner con link de instalación privado** | Cualquier plan | Cuenta de partner + flujo OAuth (sin publicar en la App Store). Flujo completo en [`api-map.md` §2](api-map.md#2-autenticación) |
+
+La aplicación a medida es el camino más corto que existe para conseguir un token. Dos condiciones
+mandan sobre la operación y hay que chequearlas antes de prometerla: **está gateada por plan** (AR =
+Escala + Evolución · BR = Escala + Next; si la tienda no llega, la vía es la app de partner con link
+privado, que funciona en cualquier plan) y **el token se muestra una sola vez** — copiarlo en ese
+momento. El resto (una app por integración, qué pasa al editar permisos, los otros tipos de app) está
+en [`api-map.md` §2](api-map.md#2-autenticación).
+
+Tres cosas más que importan:
 
 - **Los access tokens no expiran.** Se invalidan solo al generar uno nuevo o si el merchant
   desinstala la app. No hay refresh token: si el token dejó de andar, hay que reinstalar.
-- **Cambiar los scopes de la app obliga a reinstalarla en cada tienda.** Pedir de entrada los scopes
-  que el proyecto va a necesitar.
-- El `user_id` que devuelve el intercambio del `code` **es el `store_id`**.
+- **Cambiar los scopes obliga a reinstalar.** Confirmado para la aplicación a medida; **[incierto]**
+  para la app de partner (el porqué, en [`api-map.md` §2](api-map.md#2-autenticación)). Igual: pedir
+  de entrada los scopes que el proyecto va a necesitar.
+- En la app de partner, el `user_id` que devuelve el intercambio del `code` **es el `store_id`**.
 
 Variables de entorno que lee el script:
 
@@ -98,7 +113,9 @@ Reglas duras de manejo:
 2. **Nunca** pegar el token en la conversación ni en un log. El script lo enmascara siempre a los
    últimos 4 caracteres; el descuido está del lado humano.
 3. El `User-Agent` es **obligatorio**: sin ese header la API devuelve `400`. Debe llevar nombre de la
-   app y un mail o URL de contacto.
+   app y un mail o URL de contacto. Ese `400` se evalúa **después** de la autenticación: sin `User-Agent`
+   y con un token inválido la respuesta es `401`, no `400`. Un problema de UA no se puede debuggear con
+   un token que no sirve — primero conseguir un token válido.
 4. Un token por tienda. Antes de un lote, confirmar contra qué tienda se está operando con
    `GET store` y leer el `name`.
 
@@ -106,7 +123,11 @@ Reglas duras de manejo:
 
 ## 4. Uso del script `tn-api.py`
 
-Ruta: `skills/nube-skills-admin/scripts/tn-api.py`. Python 3, solo biblioteca estándar.
+Ruta: `skills/nube-skills-admin/scripts/tn-api.py`. Python 3, solo biblioteca estándar. **No hay SDK
+que adoptar:** los oficiales de la Admin API están abandonados —el de PHP hardcodea `v1` y su último
+commit de código es de 2013; el de Python está literalmente vacío, sin código— y los templates
+oficiales de app usan `axios` pelado. Cliente HTTP y throttle propios es lo que hace la propia Tienda
+Nube.
 
 ```
 python3 tn-api.py <METHOD> <PATH> [opciones]
@@ -116,6 +137,10 @@ python3 tn-api.py <METHOD> <PATH> [opciones]
 ```
 
 La URL final es `{base_url}/{api_version}/{store_id}/{path}`.
+
+Para explorar la API a mano, fuera del script, hay una **Postman collection oficial** (~250 requests)
+en `https://tiendanube.github.io/api-documentation/utils/postman-collections`. La prosa de esa página
+dice usar `/v1`, pero el JSON que se descarga viene con `2025-03`: vale el JSON.
 
 ### Opciones
 
@@ -152,8 +177,11 @@ argumentos inválidos, `--paginate` sobre algo que no es una colección).
   previo).
 - `--paginate` solo vale para `GET`; con otro método es error de uso (exit 2).
 - `--per-page` mayor a 200 **no es error**: avisa y lo baja a 200.
-- Ante un `401`, reintenta **una vez** cambiando `Authentication: bearer` por `Authorization: Bearer`
-  y lo avisa por stderr. Si vuelve a fallar, el token es el problema.
+- Manda `Authorization: Bearer` y **no reintenta con `Authentication: bearer`**: los dos headers
+  funcionan siempre —verificado con curl en `v1` y en `2025-03`, con y sin la palabra del scheme y en
+  cualquier capitalización ([`api-map.md` §2](api-map.md#2-autenticación))—, así que un fallback sería
+  código muerto. Un `401` significa **token inválido**, nunca header equivocado: no perder tiempo
+  probando variantes del header.
 - El espaciado de 2 req/s se persiste en un archivo temporal por tienda (el nombre es un hash: no
   expone el `store_id`), así que **también se respeta entre corridas seguidas**. Se puede desactivar
   con `TN_THROTTLE_STATE=off` — no hacerlo salvo contra un fixture local.
@@ -202,6 +230,11 @@ aplicaron para poder retomar el lote donde se cortó.
 
 ## 5. Paginación y rate limit en la práctica
 
+**[observado]** Las dos reglas de corte de abajo no están en la doc oficial: salen de uso propio y se
+verifican en una tienda demo (pedir `per_page=200` y contar los ítems; después pedir `page=999` y
+mirar el status). Hacen falta porque el script arma las URLs con `page=N` en vez de seguir el header
+`Link` (`rel="next"`), que sí está documentado.
+
 **Por qué el corte de página es contra la página 1.** Tienda Nube **clampea `per_page` en silencio**:
 se puede pedir 200 y recibir 100 sin ningún aviso. Si el corte fuera "página con menos ítems que el
 `per_page` pedido", el recorrido terminaría en la primera página y devolvería datos incompletos sin
@@ -209,9 +242,10 @@ error. Por eso el script mide el tamaño **real** de la página 1 y corta cuando
 que esa.
 
 **Por qué un `404` al paginar no es un error.** Al pedir una página más allá de la última, la API
-devuelve `404` en vez de un array vacío. Eso ocurre cuando el total es múltiplo exacto del tamaño de
-página. El script lo trata como fin de colección **solo si `page > 1`**; un `404` en la primera página
-sí es un error real (recurso o ruta inexistente).
+devuelve `404` en vez de un array vacío. El script solo llega a pedir esa página cuando el total es
+múltiplo exacto del tamaño de página (si no, corta antes por página corta). Lo trata como fin de
+colección **solo si `page > 1`**; un `404` en la primera página sí es un error real (recurso o ruta
+inexistente).
 
 **Cuánto tarda de verdad.** El bucket drena a **2 req/s** por par (tienda, app):
 
@@ -222,14 +256,18 @@ sí es un error real (recurso o ruta inexistente).
 | Actualizar 500 productos con `--backup` (GET + escritura c/u) | 1.000 | ~8 min |
 | Actualizar 2.000 variantes por `PATCH /products/stock-price` (50 por request) | 40 | ~20 s |
 
-Dos advertencias sobre esos números:
+Tres advertencias sobre esos números:
 
 - En planes **Next / Evolution** el límite real es ×10 (20 req/s), pero **el script siempre espacia a
   2 req/s**: no lee el plan ni se adapta. Un lote grande en una tienda Next va a tardar 10 veces más
   de lo que la tienda aguantaría. Es una limitación conocida del script, no de la API.
-- Las requests que exceden el bucket **se pierden, no se encolan**. Por eso el patrón correcto ante un
-  `429` es dormir lo que indica `x-rate-limit-reset` (viene en **milisegundos**) y reintentar, que es
-  lo que el script hace hasta `--max-retries`.
+- Las requests que exceden los 2 req/s **se encolan mientras haya lugar en el bucket de 40**; recién
+  cuando el bucket se llena empiezan los `429` y ahí sí se pierden (los números de la doc —20 de
+  golpe, 4 req/s sostenidos, 50 de golpe = 40 encoladas y 10 perdidas— están en
+  [`api-map.md` §4](api-map.md#4-límites-duros)).
+- El backoff se calcula **solo** con `x-rate-limit-reset` (viene en **milisegundos**): **no existe
+  header `Retry-After`** ni body documentado del `429`. Dormir eso y reintentar es lo que hace el
+  script hasta `--max-retries`.
 
 Para lotes de variantes, el límite no se cuenta en requests sino en **peso del payload** (weighted
 token bucket): ante `429` repetidos, **mandar menos variantes por request** en vez de esperar más.
@@ -240,12 +278,12 @@ token bucket): ante `429` repetidos, **mandar menos variantes por request** en v
 
 | Código | Qué pasó | Acción |
 |---|---|---|
-| `400` | Falta el `User-Agent`, o el JSON del body es inválido | Exportar `TN_USER_AGENT`; validar el body. El script exige el UA antes de salir a la red (exit 2) |
-| `401` | Token inválido, revocado, o app desinstalada | El script ya reintentó con el otro header de auth: reinstalar la app / regenerar el token |
+| `400` | Falta el `User-Agent`, o el JSON del body es inválido | Exportar `TN_USER_AGENT`; validar el body. El script exige el UA antes de salir a la red (exit 2). Se evalúa **después** de la auth: con token inválido y sin UA la API contesta `401` |
+| `401` | Token inválido, revocado, app desinstalada, o token ausente — **nunca** el header de auth: los dos funcionan | Reinstalar la app / regenerar el token. No probar variantes del header, no es por ahí |
 | `402` | **Tienda o app impagas: la API entera está suspendida** | No es un problema técnico ni del request. Frenar, avisar al merchant que regularice. También se cortan webhooks y scripts |
 | `403` | Feature no habilitada para el plan, scope faltante, o app sin habilitación de Partner Support | `GET store` y mirar `plan_name` y `features`. Si es un trámite (Shipping, Payments, Business Rules, Labels), ver [`no-se-puede.md` §7](no-se-puede.md) |
 | `404` | Recurso o ruta inexistente — **o** fin de colección si es `page > 1` | Verificar path y versión de API. Al paginar, el script ya lo distingue |
-| `409` | Conflicto de estado o recurso duplicado | Leer el array `errors` del body y resolver antes de reintentar |
+| `409` | Conflicto de estado (caso documentado: clientes ya asociados a otra price table) | En price tables el body trae un array `errors` con los ítems en conflicto: resolverlos antes de reintentar |
 | `415` | Falta `Content-Type` | El script lo manda solo; si aparece, es que la request no salió por el script |
 | `422` | Validación, tope de la tienda alcanzado, o combinación prohibida | Leer `description` **y** los errores por campo del formato legacy. **No reintentar sin cambiar el payload** |
 | `429` | Rate limit | El script reintenta solo. Si se agota: achicar el lote (y el batch de variantes) |

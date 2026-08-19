@@ -63,7 +63,7 @@ Opciones:
 
 Exit codes: `0` OK · `1` error de la API (4xx/5xx tras reintentos) · `2` error de uso (falta credencial, argumentos inválidos).
 
-- [ ] **Step 1: Escribir el script**
+- [x] **Step 1: Escribir el script**
 
 Requisitos de comportamiento que el código debe cumplir:
 
@@ -80,7 +80,7 @@ Requisitos de comportamiento que el código debe cumplir:
 10. **Errores con mensaje accionable** — mapear y explicar: `400` (falta `User-Agent` o JSON inválido), `401` (token inválido), `402` (**tienda o app impaga: la API está suspendida**), `403` (feature no habilitada para el plan de la tienda), `404`, `409` (conflicto), `415` (falta `Content-Type`), `422` (validación; imprimir `description` y los errores por campo del formato legacy `{"campo": ["mensaje"]}`), `429`, `5xx`.
 11. Nunca imprimir el token completo (enmascarar dejando los últimos 4 caracteres).
 
-- [ ] **Step 2: Escribir el fixture de prueba**
+- [x] **Step 2: Escribir el fixture de prueba**
 
 Un `fixture_server.py` con `http.server` en el scratchpad que simule los comportamientos reales de la API:
 - `GET /2025-03/1/products?page=1&per_page=100` → 100 items; `page=2` → 40 items; `page=3` → **404** (fin de colección).
@@ -92,7 +92,7 @@ Un `fixture_server.py` con `http.server` en el scratchpad que simule los comport
 - `GET /2025-03/1/pages` → `{"pages": {"results": [...]}}` (envelope v2).
 - `PUT /2025-03/1/products/5` → eco del body recibido; `GET /2025-03/1/products/5` → estado actual (para probar `--backup`).
 
-- [ ] **Step 3: Correr los casos y verificar**
+- [x] **Step 3: Correr los casos y verificar**
 
 Levantar el fixture y correr, verificando cada resultado:
 
@@ -113,7 +113,7 @@ Levantar el fixture y correr, verificando cada resultado:
 
 Ajustar el script hasta que los 12 casos pasen. Al terminar, **borrar el fixture**.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add skills/nube-skills-admin/scripts/tn-api.py
@@ -131,7 +131,7 @@ git commit -m "feat(admin): cliente tn-api.py con rate limit, paginación y dry-
 - Consumes: nada.
 - Produces: la referencia que `SKILL.md` (Task 6) enlaza para "necesito saber qué endpoints existen y con qué límites".
 
-- [ ] **Step 1: Escribir el archivo**
+- [x] **Step 1: Escribir el archivo**
 
 Fuentes (en el scratchpad de docs): `resources.txt`, `resources__product.txt`, `resources__product_variant.txt`, `resources__category.txt`, `resources__order.txt`, `resources__customer.txt`, `resources__coupon.txt`, `resources__store.txt`, `resources__webhook.txt`, `authentication.txt`, `versioning.txt`, `CHANGELOG.txt`, más los de fulfillment/locations/metafields/custom-fields/pages/blog/email-templates.
 
@@ -144,7 +144,7 @@ Contenido, con tabla de contenidos al inicio:
 6. **Errores** — formatos (moderno `{code,message,description}` y legacy por campo) y tabla de códigos con su causa real.
 7. **Feature detection** — `GET /store` → `plan_name` y `features` (`inventory-levels`, `fulfillment-orders`, `fulfillment_order_label_api`) y qué cambia cada uno.
 
-- [ ] **Step 2: Validar y commitear**
+- [x] **Step 2: Validar y commitear**
 
 ```bash
 python3 scripts/validate.py
@@ -162,7 +162,7 @@ git commit -m "docs(admin): referencia del mapa de la API"
 **Interfaces:**
 - Produces: la referencia que sostiene el **triage de factibilidad** del Paso 1 de `SKILL.md`. Es el archivo de mayor valor para consultoría.
 
-- [ ] **Step 1: Escribir el archivo**
+- [x] **Step 1: Escribir el archivo**
 
 Fuentes: `resources__order.txt`, `resources__store.txt`, `resources__script.txt`, `resources__kit.txt`, `resources__cart.txt`, `resources__customer.txt`, `guides__*.txt`, más el barrido de namespaces inexistentes.
 
@@ -178,7 +178,7 @@ Estructura: una sección por área, cada limitación con **qué se pide**, **por
 8. **Scripts** — se crean en el Partner Portal, no por API; `POST/PUT/DELETE` solo asocian scripts no auto-instalables, y el evento `onload` requiere aprobación.
 9. **Deadline NubeSDK** (afecta la planificación, no solo el "no se puede") — desde el **30/08/2026** las apps que inyectan scripts sin NubeSDK no reciben instalaciones nuevas, y desde el **30/10/2026** empieza la desinstalación progresiva. **Aplica también a apps privadas con `write_scripts`**, así que toca a las apps propias de la agencia.
 
-- [ ] **Step 2: Validar y commitear**
+- [x] **Step 2: Validar y commitear**
 
 ```bash
 python3 scripts/validate.py
@@ -196,7 +196,7 @@ git commit -m "docs(admin): mapa de lo que la API no permite"
 **Interfaces:**
 - Produces: los guardarraíles que `SKILL.md` aplica automáticamente.
 
-- [ ] **Step 1: Escribir el archivo**
+- [x] **Step 1: Escribir el archivo**
 
 Cada entrada con: **operación**, **qué destruye**, **por qué pasa** y **antídoto concreto**.
 
@@ -222,7 +222,7 @@ Más: **efecto de desinstalar la app** (se borran shipping carriers, payment pro
 
 Cerrar con la sección **"Incógnitas"**: el comportamiento de `PUT /products/{id}` parcial (ver "Incógnitas conocidas" del encabezado de este plan) — la evidencia práctica del equipo dice merge, la doc dice reemplazo, `categories: []` sí borra. Redactarlo como incertidumbre con su método de verificación en tienda demo, nunca como afirmación.
 
-- [ ] **Step 2: Validar y commitear**
+- [x] **Step 2: Validar y commitear**
 
 ```bash
 python3 scripts/validate.py
@@ -240,7 +240,7 @@ git commit -m "docs(admin): operaciones destructivas y sus antídotos"
 **Interfaces:**
 - Consumes: el contrato exacto de `scripts/tn-api.py` (Task 1) — leer el `--help` del script y documentarlo sin inventar flags.
 
-- [ ] **Step 1: Escribir el archivo**
+- [x] **Step 1: Escribir el archivo**
 
 1. **Elegir el brazo ejecutor** — tabla de decisión: qué resuelve el **MCP oficial** (`https://admin-mcp.tiendanube.com/mcp`, Brasil `admin-mcp.nuvemshop.com.br`; 28 tools: productos incluido bulk stock/precio ≤50 y visibilidad ≤20, categorías, cupones, promociones, lectura de órdenes y clientes, métodos de pago y envío) y qué **solo** se puede con el script (fulfillment y tracking, metafields, custom fields, locations/multi-inventario, draft orders, webhooks, páginas, blog, email templates, price tables, abandoned checkouts, escritura sobre pedidos).
 2. **Conectar el MCP oficial** — OAuth con Dynamic Client Registration; **una conexión = una tienda**; scopes que declara.
@@ -250,12 +250,12 @@ git commit -m "docs(admin): operaciones destructivas y sus antídotos"
 6. **Errores** — tabla de códigos con la acción recomendada para cada uno (en especial `402` tienda impaga y `403` feature no habilitada).
 7. **Sin acceso a API** — cómo trabajar guiando por el admin web cuando no hay token ni MCP.
 
-- [ ] **Step 2: Verificar que el documento coincide con el script**
+- [x] **Step 2: Verificar que el documento coincide con el script**
 
 Run: `python3 skills/nube-skills-admin/scripts/tn-api.py --help`
 Contrastar una por una las opciones documentadas contra la salida real. Corregir el documento (no el script) ante cualquier diferencia.
 
-- [ ] **Step 3: Validar y commitear**
+- [x] **Step 3: Validar y commitear**
 
 ```bash
 python3 scripts/validate.py
@@ -273,7 +273,7 @@ git commit -m "docs(admin): guía de ejecución (MCP oficial vs script)"
 **Interfaces:**
 - Consumes: los 4 references (Tasks 2-5) y el contrato del script (Task 1).
 
-- [ ] **Step 1: Escribir el frontmatter**
+- [x] **Step 1: Escribir el frontmatter**
 
 ```yaml
 ---
@@ -284,7 +284,7 @@ description: "Expert on the TiendaNube/Nuvemshop admin backoffice and Admin API 
 
 Contarla: debe ser ≤1024 caracteres. Si excede, recortar los ejemplos de triggers, nunca las exclusiones.
 
-- [ ] **Step 2: Escribir el cuerpo**
+- [x] **Step 2: Escribir el cuerpo**
 
 1. **Overview** (3 líneas) — qué cubre; que el storefront es territorio de `nube-skills-themes`.
 2. **Paso 0 — Capacidades reales de ESTA tienda.** Identificar tienda y vía de acceso (MCP oficial conectado / token propio / solo admin web) y correr `GET /store` para leer `plan_name` y `features`. Qué cambia: `inventory-levels` (el stock va por `inventory_levels`, no por `variant.stock`), plan Next (rate limit ×10, Labels API), tienda impaga (`402` en toda la API). Sin acceso a API, la skill sigue siendo útil: guía por el admin web.
@@ -294,7 +294,7 @@ Contarla: debe ser ≤1024 caracteres. Si excede, recortar los ejemplos de trigg
 6. **Navegación de referencias** — tabla "leé X cuando Y" con los 4 archivos.
 7. **Reglas duras** — (1) nunca prometer sin pasar por el triage; (2) nunca escribir sin dry-run + backup + confirmación; (3) nunca imprimir ni commitear tokens; (4) usar `2025-03`, no `v1`; (5) verificar `features` de la tienda antes de tocar stock; (6) no inventar endpoints — si no está en `api-map.md`, no existe.
 
-- [ ] **Step 3: Verificar enlaces y tamaño**
+- [x] **Step 3: Verificar enlaces y tamaño**
 
 Run:
 ```bash
@@ -303,7 +303,7 @@ wc -l skills/nube-skills-admin/SKILL.md
 ```
 Expected: los 4 nombres exactos (`api-map.md`, `no-se-puede.md`, `operaciones-peligrosas.md`, `ejecucion.md`) y menos de 500 líneas.
 
-- [ ] **Step 4: Validar y commitear**
+- [x] **Step 4: Validar y commitear**
 
 Run: `python3 scripts/validate.py`
 Expected: `OK: 5 skill(s) válidas y manifiestos correctos`

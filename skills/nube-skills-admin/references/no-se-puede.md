@@ -5,13 +5,14 @@ Mapa de límites de la plataforma para el **triage de factibilidad**: antes de p
 | Cajón | Significa |
 |---|---|
 | 🖐️ **Solo admin web** | Existe en el panel, pero no hay endpoint. Se hace a mano o se guía al cliente. |
-| ⚠️ **Con aprobación de TN** | Existe, pero Tienda Nube tiene que habilitarlo antes (formulario, mail o plan). Sección 7. |
+| ⚠️ **Con condición previa** | Se puede, pero no por el camino estable: Tienda Nube tiene que habilitarlo antes (formulario, mail o plan — sección 7), o vive solo en el canal `unstable`, que puede cambiar o desaparecer sin aviso. |
 | ❌ **No se puede** | No existe ni en la API ni en el panel. Solo queda un rodeo, o nada. |
 
 **Reglas de uso:**
 
 - Todo lo de acá está verificado contra la doc oficial `tiendanube.github.io/api-documentation`, versión **2025-03**, al **2026-08-18**. La plataforma cambia: ante una duda de alto impacto, re-verificar antes de comprometerse.
 - Donde la doc **no** define un comportamiento, este documento lo dice explícitamente (marcado como *incierto*). No completar el hueco con suposiciones.
+- Lo que existe **solo en el canal `unstable`** está marcado como tal: sirve para no decir "no se puede", pero **no se cotiza como estable** — puede cambiar o desaparecer sin aviso.
 - Si un endpoint no está ni acá ni en [`api-map.md`](api-map.md), **asumir que no existe**. Inventar un endpoint plausible es el error más caro de esta skill.
 
 ## Tabla de contenidos
@@ -31,20 +32,36 @@ Mapa de límites de la plataforma para el **triage de factibilidad**: antes de p
 
 ## 1. Órdenes
 
-Es el área donde más se sobreestima la API. **La orden creada es casi inmutable**: la doc de `PUT /orders/{id}` dice literalmente *"Change an Order's attributes (just owner_note for now) and/or update an Order's status"*. Ese "just owner_note for now" es todo el margen de escritura que hay.
+Es el área donde más se sobreestima la API. **En la versión estable `2025-03`, la orden creada es casi inmutable**: la doc de `PUT /orders/{id}` dice literalmente *"Change an Order's attributes (just owner_note for now) and/or update an Order's status"*. Ese "just owner_note for now" es todo el margen de escritura que hay en estable. La excepción vive en el canal `unstable` y está descrita abajo de la tabla: `POST /orders/{id}/edit`.
 
 | Se pide | Por qué no se puede | Alternativa real |
 |---|---|---|
-| Editar ítems, cantidades o precios de un pedido | `PUT /orders/{id}` solo acepta `owner_note` y `status`. La edición de pedidos existe en el panel, pero la API solo expone su **lectura**: `GET /orders/{id}/history/editions` | 🖐️ Editar en el admin. Por API, el único rodeo es cancelar y crear una orden nueva con `POST /orders` (número nuevo, sin transacción asociada) |
+| Editar ítems, cantidades o precios de un pedido | En `2025-03`, `PUT /orders/{id}` solo acepta `owner_note` y `status`, y de la edición de pedidos la API estable expone únicamente su **lectura**: `GET /orders/{id}/history/editions` | En el canal `unstable` **sí se puede**: `POST /orders/{id}/edit` (ver abajo, con sus restricciones). En estable: 🖐️ editar en el admin, o cancelar y crear una orden nueva con `POST /orders` (número nuevo, sin transacción asociada) |
 | Cambiar dirección de envío, datos de facturación o el cliente del pedido | Mismo motivo: no son campos escribibles del `PUT` | 🖐️ Admin web |
 | Cambiar el medio de pago de un pedido | `gateway`: *"The internal value is read-only and cannot be set via the API"*. `gateway_id` y `gateway_name` están marcados `[Read-only]` | 🖐️ Admin web |
-| Reembolsar (total o parcial) | ❌ No hay endpoint de reembolsos. El flujo documentado es al revés: **el merchant pide el reembolso desde el panel** y Tienda Nube hace `POST` al `info.refund_url` que declaró la app de pagos | Solo una **app de pagos propia** (scope `write_payments`) participa del flujo. Para el resto: 🖐️ admin web + reembolso por fuera |
+| Reembolsar (total o parcial) | En `2025-03` no hay endpoint para **pedir** un reembolso. El flujo documentado es al revés: **el merchant lo pide desde el panel** y Tienda Nube hace `POST` al `info.refund_url` que la app de pagos declaró al crear la Transaction | Dos vías: (a) canal `unstable`, `POST /orders/{id}/edit` con `auto_partial_refund: true` — **la única forma en que una app que no es de pagos devuelve dinero** (ver abajo); (b) **app de pagos propia**: contesta `202 Accepted` y, cuando el reembolso se concreta, lo **reporta** con un Transaction Event de tipo `refund` (`POST /orders/{order_id}/transactions/{transaction_id}/events`). Si ninguna aplica: 🖐️ admin web + reembolso por fuera |
 | "Marcar el pedido como pagado" | *"In fact, there is no action to pay an order. Orders are paid when sending a Transaction with status success"* | Ser app de pagos y crear la Transaction; si no, 🖐️ admin web |
 | Descancelar un pedido | `POST /orders/{id}/open` está documentado como *"Re-open a closed Order"* — revierte un `close`, no un `cancel`. No hay endpoint para revertir `cancelled` | ❌ Crear un pedido nuevo. *Incierto:* la doc no define qué transiciones de `status` acepta el `PUT`; **no experimentar en producción** |
 | Emitir o guardar la factura / NFe | *"We currently do not offer an Invoice API"* | Metafields sobre la orden (`GET /metafields/orders?owner_id=…&namespace=nfe&key=list`), con el valor como **string JSON** de la lista de comprobantes (`key`, `link`, `fulfillment_order_id`). **Usar el formato de la doc tal cual** para que otras apps puedan leerlo. Guarda el dato, no emite el comprobante |
-| Borrar un pedido | ❌ No hay `DELETE /orders/{id}` en la doc: los endpoints del recurso son listar, obtener, crear, actualizar (limitado), historiales, cerrar, reabrir y cancelar | Cancelar con `POST /orders/{id}/cancel` (irreversible) |
-| Que un pedido creado por API descuente stock | Depende del *inventory behavior*: con `claim` reserva, con `bypass` no | Definirlo explícitamente al crear la orden y verificar el resultado |
+| Borrar un pedido | ❌ No hay `DELETE /orders/{id}` en la doc: los endpoints del recurso son listar, obtener, crear, actualizar (limitado), historiales, suscripciones, cerrar, reabrir y cancelar | Cancelar con `POST /orders/{id}/cancel` (irreversible) |
+| Que un pedido creado por API descuente stock | Depende del `inventory_behaviour`: con `claim` reserva, con `bypass` no — y **`bypass` es el default**, así que por omisión no descuenta | Mandarlo explícitamente al crear la orden y verificar el resultado |
 | Que el merchant vea qué procesador cobró un pedido creado por API | Las órdenes creadas por API no leen la Transaction asociada | La doc recomienda crear la orden como pagada y volcar `external_id` / `external_url` en `owner_note` |
+
+### La excepción: `POST /orders/{id}/edit` (canal `unstable`)
+
+El "no se puede editar pedidos" es cierto en `2025-03` y **falso en `unstable`**: ahí el endpoint existe, está documentado y edita líneas de verdad.
+
+| Qué permite | Detalle |
+|---|---|
+| Agregar, modificar y quitar productos | `quantity: 0` quita la línea. **Cada ítem necesita `fulfillment_order_id` y `modify_stock`** (si el stock se devuelve o no) |
+| Descuentos | Se pueden **quitar** los que haya; agregar, **solo** los de tipo `coupon` |
+| Devolver dinero | `auto_partial_refund: true`. Es **la única forma en que una app que no es de pagos reembolsa** |
+| Flags de control | `skip_shipping_requote` (no recotizar el envío), `notify_customer`, `reason` |
+
+- **Restricción dura:** solo funciona mientras **todos** los fulfillment orders del pedido estén en `unpacked`. Con uno solo empacado, no hay edición: ahí vuelve a valer la tabla de arriba.
+- **El reembolso es asincrónico:** la respuesta trae `auto_partial_refund_status` ∈ `success | skipped | failed`, pero el resultado firme se confirma con el webhook `order/updated`. No dar por devuelta la plata con el 200 del `edit`.
+- **No cubre** dirección de envío, datos de facturación, cliente ni medio de pago: para eso sigue siendo 🖐️ admin web.
+- **Advertencia obligatoria al cotizar:** `unstable` es un canal sin garantías — puede cambiar de contrato o desaparecer sin aviso. Si se construye sobre esto, va aislado detrás de una capa propia, con monitoreo, y con el riesgo dicho por escrito al cliente. No presentarlo como ✅ "por API" pleno.
 
 **Cerca pero distinto:** `POST /orders/{id}/cancel` sí existe, es irreversible y sus parámetros `email` y `restock` son `true` por default → ver [`operaciones-peligrosas.md`](operaciones-peligrosas.md).
 
@@ -64,8 +81,8 @@ Es el área donde más se sobreestima la API. **La orden creada es casi inmutabl
 | Cambiar el tema activo | `current_theme` es lectura | 🖐️ Admin web (ver sección 4) |
 | Editar datos fiscales del negocio (`business_id`, `business_name`, `business_address`) | Lectura | 🖐️ Admin web |
 | Forzar o soltar la creación de cuenta en el checkout (`customer_accounts`) | Lectura | 🖐️ Admin web |
-| Configurar impuestos | ❌ No existe recurso de impuestos. En toda la doc, `tax` aparece únicamente dentro de Payment Provider y Transaction (datos de la app de pagos), nunca como configuración de la tienda | 🖐️ Admin web |
-| Configurar zonas, costos o reglas de envío nativas | ❌ No existe recurso. `shipping-carrier` sirve para que **una app de envíos publique sus propias opciones**, no para tocar las zonas nativas del panel | 🖐️ Admin web, o ⚠️ construir una Shipping App (sección 7) |
+| Configurar impuestos | ❌ No existe recurso de impuestos. En toda la doc, `tax` aparece solo como dato de app de pagos o de checkout (`plus_tax` en Payment Provider, `payment_provider_tax_id` en Transaction, el documento fiscal del comprador en Business Rules), nunca como configuración de la tienda | 🖐️ Admin web |
+| Configurar zonas, costos o reglas de envío nativas | ❌ No hay escritura. `shipping-carrier` sirve para que **una app de envíos publique sus propias opciones**, no para tocar las zonas nativas del panel. **Leer sí se puede**: `GET /shipping_carriers/options` (scope `read_shipping`) lista **todos** los carriers de la tienda, nativos incluidos, con sus códigos reales — pero no expone zonas ni tarifas | 🖐️ Admin web para configurar, o ⚠️ construir una Shipping App (sección 7). Para saber qué medios de envío tiene activos la tienda, alcanza con la lectura |
 | Activar/configurar medios de pago nativos | `GET /payment-options` es **solo lectura** de lo ya activo en el checkout; `payment-provider` es para apps de pago | 🖐️ Admin web, o ⚠️ Payments App (sección 7) |
 | Personalizar el checkout | ❌ No hay API de configuración de checkout. Solo hay puntos de extensión para apps de pago (`checkout_js_url`) y NubeSDK | ⚠️/🖐️ según el caso |
 
@@ -82,7 +99,7 @@ La API está pensada para **datos de la tienda**, no para administrarla como org
 | Crear usuarios del panel, asignar roles o permisos | ❌ No existe recurso de staff/usuarios/roles en la API | 🖐️ Admin web |
 | Auditar quién hizo qué en el panel | ❌ No hay log de actividad expuesto. Lo más cercano es `GET /orders/{id}/history/editions` y `/history/values`, acotado a una orden | 🖐️ Admin web |
 | Traer los reportes o métricas del panel | ❌ No hay API de analytics ni de reportes | Reconstruir paginando `GET /orders` |
-| Reconstruir métricas de ventas por API | Se puede, con dos límites duros: **una query devuelve como máximo 10.000 items** (*"Query results are limited to 10.000 items"*) y el rate limit real es de 2 req/s | Particionar con `created_at_min` / `created_at_max` (la propia doc recomienda "import by period"), `per_page=100`, y presupuestar el tiempo: 10.000 pedidos ≈ 100 requests ≈ 50 s solo de red |
+| Reconstruir métricas de ventas por API | Se puede, con dos límites duros: **una query devuelve como máximo 10.000 items** (*"Query results are limited to 10.000 items"*) y el rate limit es un leaky bucket de 40 requests que drena a **2 req/s** por tienda-app (×10 en planes Next/Evolution) | Particionar con `created_at_min` / `created_at_max` (la propia doc recomienda "import by period"), `per_page=100`, y presupuestar el tiempo: 10.000 pedidos ≈ 100 requests ≈ 50 s de red en un plan estándar |
 | Exportar un reporte a CSV/Excel | ❌ No hay endpoint de export | 🖐️ Descargar del panel |
 
 ---
@@ -97,6 +114,8 @@ La API está pensada para **datos de la tienda**, no para administrarla como org
 | Publicar/cambiar el tema activo | `current_theme` es lectura | 🖐️ Admin web |
 | Inyectar HTML/JS en el storefront desde la Admin API | ❌ No por Admin API | Scripts de app (sección 8) o NubeSDK, con sus condiciones |
 
+**Brecha conocida (no es API pública soportada):** el CLI de temas habla con una API de *theme-installations* **no documentada** — `GET/POST /v1/{store_id}/theme-installations` y `…/{id}/publish|fork|clone|unfork|file-hashes|files`. Aplica **solo a temas Ipanema**, con un máximo de **2 instalaciones por tienda**, y **el token sale de la autenticación del CLI, no de un scope OAuth**: no hay forma soportada de usarla desde una app ni de pedirle permiso al merchant. Sirve para entender que el CLI puede hacer cosas que la Admin API no expone; el camino real sigue siendo la skill **`nube-skills-themes`**. No ofrecerla como integración.
+
 ---
 
 ## 5. Promociones nativas
@@ -105,14 +124,14 @@ Esto genera confusión constante: **la "Discounts API" pública no es un CRUD de
 
 - El partner registra una **callback URL**; Tienda Nube le manda el estado del carrito **en cada cambio** y la app responde con *comandos* de aplicar/quitar descuento.
 - **Timeout de 800 ms** para responder. Si la app no responde a tiempo, el carrito queda sin cambios; si responde algo que no cumple la especificación, la plataforma **quita todos los descuentos aplicados** ("we will try to protect the merchant from money losses instead of getting a new sale").
-- Seguridad: Tienda Nube comparte una **lista de IPs para whitelist (WAF)** y un token secreto para firmar cada request; validar la firma es responsabilidad del partner.
-- `GET /promotions` lista las promociones **creadas por tu app** en esa tienda, no las nativas del panel. `PUT /discounts/callbacks` solo cambia la URL del callback.
+- Seguridad hoy: Tienda Nube comparte una **lista de IPs para whitelist (WAF)** y el partner es responsable de bloquear cualquier otra conexión. La firma de cada request con un token secreto está en la doc bajo **"Upcoming changes"** — todavía no es el mecanismo vigente, no diseñar la seguridad asumiéndola.
+- `POST /promotions` **sí existe**: registra en la tienda las promociones **de tu app** (es lo que habilita el tráfico de callbacks) y `GET /promotions` lista las no borradas creadas por tu app. Ninguno toca las promociones nativas del panel. `PUT /discounts/callbacks` solo cambia la URL del callback: **borrarla no se puede**.
 - Si el merchant **desinstala la app de promociones, todas sus promociones se borran permanentemente** y deja de llegar tráfico de carrito.
 - La doc aclara que **multimoneda no está soportado** en esta API: no recomendarla en tiendas con esa feature.
 - Si el partner deja de responder o responde tarde, **se quitan las promociones registradas en updates anteriores**: la disponibilidad del servicio del partner es parte del producto, no un detalle de infra.
 - Si una promoción deja de existir o se desactiva, **es responsabilidad del partner quitar el descuento del carrito**; si no, el carrito lo sigue aplicando y el merchant pierde plata.
 
-**Brecha conocida (marcada como tal):** el MCP oficial de administración expone `create_promotion` / `update_promotion` / `delete_promotion`, pero la REST pública documentada **no** tiene ese CRUD. Si el pedido es "crear promociones nativas por API", la vía comprobada es el **MCP oficial** (ver [`ejecucion.md`](ejecucion.md)) — no inventar un `POST /promotions` nativo.
+**Brecha conocida (marcada como tal):** el MCP oficial de administración expone `create_promotion` / `update_promotion` / `delete_promotion` sobre las promociones nativas; la REST pública **no** tiene ese CRUD nativo — su `POST /promotions` pertenece al mecanismo de apps partner descrito arriba y su contrato exacto la doc lo delega a un `Openapi.yml` externo (**[incierto]** sin ese archivo no se puede afirmar el payload). Si el pedido es "crear promociones nativas por API", la vía comprobada es el **MCP oficial** (ver [`ejecucion.md`](ejecucion.md)).
 
 **Lo que sí resuelve la mayoría de los pedidos reales:** los **cupones** tienen CRUD completo (`/coupons`).
 
@@ -126,16 +145,17 @@ Límites sueltos que aparecen a mitad de una implementación y hacen replanifica
 |---|---|---|
 | API de facturación electrónica | *"We currently do not offer an Invoice API"* | Metafields namespace `nfe` (sección 1) |
 | Importar/exportar catálogo por CSV | ❌ No hay endpoint de import/export en la doc | Recorrer por API producto por producto, o 🖐️ usar el importador del panel |
-| Crear un carrito o agregarle ítems por API | El recurso Cart solo tiene `GET /carts/{id}`, `DELETE /carts/{id}/line-items/{id}` y `DELETE /carts/{id}/coupons/{id}`. Además, un carrito ya convertido (o en proceso de conversión) a orden **deja de ser accesible** | Draft Orders: `POST /draft-orders` + confirmar |
+| Crear un carrito o agregarle ítems por API | El recurso Cart solo tiene `GET /carts/{id}`, `DELETE /carts/{id}/line-items/{id}` y `DELETE /carts/{id}/coupons/{id}`. Además, un carrito ya convertido (o en proceso de conversión) a orden **deja de ser accesible** | Draft Orders: `POST /draft_orders` + `POST /draft_orders/{id}/confirm` |
 | Editar un draft order | Solo hay listar, obtener, crear, confirmar y borrar. **No hay `PUT`** | Borrar y volver a crear |
 | Borrar un cliente con pedidos | Documentado: *"It's not possible to delete customers with associated orders"* → `422` con `"Cannot delete a customer with orders"` | Actualizar/anonimizar con `PUT /customers/{id}`; para bajas legales, el flujo LGPD |
+| Loguear un cliente, manejar su sesión o resetear su contraseña | ❌ No hay endpoint de login/sesión ni de reset de password, y `PUT /customers/{id}` no acepta `password` | **En el alta sí**: `POST /customers` acepta `password` y `send_email_invite: true` (crea la cuenta con clave y manda el mail de invitación). Para identificar al cliente ya logueado en el storefront, ⚠️ App Proxy (sección 7): firma HMAC sobre `X-Store-Id + X-Customer-Id + X-Request-Id` concatenados **sin separador** |
 | Crear o modificar kits (bundles) | *"This is a read-only resource. Kits are managed through the store's admin panel"*. Además solo admiten componentes de un producto de **una sola variante** | 🖐️ Admin web |
 | Crear o borrar plantillas de email | Solo `GET /email-templates`, `GET /email-templates/{id}` y `PUT /email-templates/{id}`, sobre **8 tipos fijos** (`orderconfirmation`, `ordershipped`, `ordercancelled`, `ordercaptured`, `abandonedcheckoutrecover`, `customer_activate_account`, `customer_reset_password`, `customer_welcome_account`) | Editar las existentes (asunto, texto y HTML por idioma) |
 | Recuperar carritos abandonados viejos | *"it is not possible to fetch abandoned checkouts from over 30 days ago"* y se borran a los 90 días. Solo se pueden leer y crear un cupón asociado | Sincronizar seguido; no diseñar procesos que dependan de histórico largo |
 | Gestionar canales de venta | ❌ No existe recurso de sales channels. `channels` es solo un **filtro de lectura** en `GET /orders` (`form`, `store`, `api`, `meli`, `pos`) | 🖐️ Admin web / app del canal |
 | Guardar metafields en cualquier recurso | Los metafields **solo** se asocian a `Product`, `Product_Variant`, `Category`, `Page`, `Order` y `Customer`. No hay metafields de tienda, cupón, location ni fulfillment order | Guardarlo del lado de la app, o colgarlo de una de las 6 entidades soportadas |
 | Poner un cliente en dos listas de precios (B2B) | *"A customer can only be associated with one price table at a time"*: si un cliente del payload ya está asociado, **falla el lote entero** con `409 Conflict` | Desasociar primero (`DELETE /products/price-tables/{id}/customers/{customerId}`) y después asociar a la nueva |
-| Sacar el ID de una app o gestionar la app desde la API | ❌ La gestión de apps y scopes vive en el Partner Portal | 🖐️ Partner Portal |
+| Registrar una app, cambiar sus scopes o consultar su ID por API | ❌ El alta de la app y sus permisos viven en el Partner Portal. Lo único que la API expone a nivel app son los endpoints de Billing (`POST /plans`, `/subscriptions`, `/charges`), bajo autenticación *Partner-Action* con URL `…/{version}/apps/{app_id}/…` — o sea que el `app_id` es un dato de entrada, no algo que se consulte | 🖐️ Partner Portal |
 
 ---
 
@@ -150,9 +170,8 @@ No es "no se puede": es **"pedí permiso primero"**. Al cotizar, tratarlo como d
 | **Business Rules** (filtrar envíos/pagos/locations en el checkout) | Crear la app y pedirle al Partner Support Team que la habilite |
 | **App Proxy** (servir contenido propio bajo el dominio de la tienda) | Escribir a `parceiros@nuvemshop.com.br` / `socios@tiendanube.com` para que lo configuren |
 | **Scripts con evento `onload`** | Mail previo a `api@nuvemshop.com.br` explicando la funcionalidad y el motivo, con `APP_ID` y `APP_NAME` en el asunto. Sin aprobación, el script se crea como `onfirstinteraction`. No hace falta si el script corre **solo** en el checkout |
-| **Labels API** (etiquetas de envío en fulfillment orders) | Requiere la feature `fulfillment_order_label_api`, que *"currently... is only granted to stores on the Next plan"*. Sin ella, todo endpoint de Labels responde `403`. Verificar en `features` de `GET /store` |
-| **Nueva Product API con multi-inventario** | *"currently being rolled out to every merchant... Please contact us to activate this new version in your stores if needed"* |
-| **Nueva Fulfillment Events API con multi-inventario** | Mismo caso: *"Please contact us to activate this"* |
+| **Labels API** (etiquetas de envío) | Gated por la feature `fulfillment_order_label_api`, que hoy se otorga solo en plan **Next**; sin ella todo endpoint de Labels devuelve `403` (ver [`api-map.md` §3 y §7](api-map.md#7-feature-detection)). Antes de cotizarla, mirar `features` en `GET /store`; la doc de Shipping Carrier solo la nombra de refilón (el `callback_labels_url` *"is used by the Labels API for asynchronous label generation"*), así que el trámite concreto se confirma con Partner Support |
+| **Nueva Fulfillment Events API con multi-inventario** | *"currently being rolled out to every merchant... Please contact us to activate this new version in your stores if needed"* (doc de Shipping Carrier). Para la nueva Product API con multi-inventario la doc **no** enuncia un trámite equivalente: la guía de multi-inventario describe el cambio de comportamiento, no una habilitación |
 | **Disputes API** | Solo tiene sentido para apps de pago: requiere scope `write_payments` y filtra por el `app_id` del token |
 
 **Cómo pedirlo bien** (aplica a todas las filas): mandar el `APP_ID`, el nombre de la app, para qué tienda(s) y el caso de uso concreto. Y avisarle al cliente que el reloj del proyecto no arranca hasta que llega la habilitación: es la dependencia externa que más veces desarma un cronograma.
@@ -189,7 +208,7 @@ Afecta la **planificación**, no solo el "se puede / no se puede": hay apps prop
 
 ## 10. Cómo comunicar un "no se puede"
 
-1. **Nombrar el cajón antes de nada:** ✅ por API · ⚠️ con aprobación de TN · 🖐️ solo admin web · ❌ no se puede. Nunca prometer sin haber pasado por acá.
+1. **Nombrar el cajón antes de nada:** ✅ por API · ⚠️ con condición previa (aprobación de TN o canal `unstable`) · 🖐️ solo admin web · ❌ no se puede. Nunca prometer sin haber pasado por acá.
 2. **Citar la fuente**, no la intuición: "la doc de `PUT /orders/{id}` dice que solo acepta `owner_note` y `status`". Si no hay fuente, decir *"la doc no lo define"* y proponer cómo verificarlo en una tienda demo.
 3. **Ofrecer la alternativa real** en la misma frase: el rodeo por API, el paso manual en el panel, o el trámite de habilitación con su costo de tiempo.
 4. **No prometer plazos** de las aprobaciones de la sección 7: dependen de Tienda Nube.
@@ -197,4 +216,4 @@ Afecta la **planificación**, no solo el "se puede / no se puede": hay apps prop
 
 **Respuesta modelo:**
 
-> "Editar el precio de una línea de un pedido ya cerrado: 🖐️ **solo admin web**. La API expone `PUT /orders/{id}` únicamente para `owner_note` y `status`, y de la edición de pedidos solo deja **leer** el historial (`GET /orders/{id}/history/editions`). Opciones: lo edita alguien en el panel, o —si tiene que ser automático— se cancela el pedido y se crea uno nuevo por API, con número nuevo y sin la transacción original asociada."
+> "Editar el precio de una línea de un pedido: ⚠️ **se puede, pero solo en el canal `unstable`**. En la API estable (`2025-03`) es 🖐️ admin web — `PUT /orders/{id}` acepta únicamente `owner_note` y `status`, y de la edición de pedidos solo deja **leer** el historial (`GET /orders/{id}/history/editions`). La vía por API es `POST /orders/{id}/edit` (con `auto_partial_refund` si además hay que devolver plata), pero exige que **todos** los fulfillment orders estén en `unpacked` y ese canal puede cambiar sin aviso: si la tomamos, va con esa advertencia por escrito. Si no, lo edita alguien en el panel, o se cancela el pedido y se crea uno nuevo por API, con número nuevo y sin la transacción original asociada."

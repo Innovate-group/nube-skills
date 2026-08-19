@@ -35,16 +35,19 @@ Nunca respondas ni ejecutes sobre "Tienda Nube en general": el comportamiento co
 | **Token propio** de una app instalada | Lotes, escrituras riesgosas, o cualquier recurso fuera del catálogo | Todo lo que la API expone, con `--dry-run` y `--backup` |
 | **Solo admin web** | No hay token ni MCP | La skill sigue siendo útil: triage + guía por el panel |
 
+Para **conseguir** ese token propio, la vía más simple es la **Aplicación a medida**: el propio comerciante la crea desde su admin (*Aplicaciones a medida → Crear*), elige scopes y obtiene el token, sin cuenta de partner, sin OAuth y sin homologación. Tiene gate por plan (AR: Escala o Evolución · BR: Escala o Next) y **el token se muestra una sola vez**. Una app a medida por integración, para poder revocarlas por separado; agregar scopes obliga a reinstalar y emite token nuevo. Si el plan no la habilita, la vía es una app de partner con link de instalación privado, que funciona en cualquier plan.
+
 **2. Leé las capacidades de la tienda** antes de cualquier operación no trivial:
 
 ```bash
-python3 <carpeta-de-esta-skill>/scripts/tn-api.py GET store --param fields=name,plan_name,features
+# desde la carpeta de esta skill
+python3 scripts/tn-api.py GET store --param fields=name,plan_name,features
 ```
 
 Qué cambia según lo que devuelva:
 
 - **`features` incluye `inventory-levels`** → el stock ya **no** se escribe en `variant.stock`, va por `variant.inventory_levels[]` con `location_id` explícito. Escribir en `variant.stock` con multi-location vuelca todo el total en la primera location.
-- **`features` incluye `fulfillment-orders`** → despachar por `/orders/{id}/fulfillment-orders/{fid}`; los endpoints legacy `/orders/{id}/fulfillments` impactan **solo en el primer** fulfillment order.
+- **`features` incluye `fulfillment-orders`** → despachar por `/orders/{id}/fulfillment-orders/{fid}`; los endpoints legacy (`/orders/{id}/fulfill`, `/pack`, `/fulfillments`) impactan **solo en el primer** fulfillment order.
 - **`features` incluye `fulfillment_order_label_api`** → Labels API disponible (hoy solo plan Next). Sin la feature, todo endpoint de Labels responde `403`.
 - **Plan Next / Evolution** → rate limit ×10 (20 req/s). Ojo: el script siempre espacia a 2 req/s, no se adapta.
 - **`402` en cualquier request** → tienda o app impaga: la API entera está suspendida, y los webhooks y scripts también. No es un problema técnico: frená y avisá que hay que regularizar el pago.
@@ -61,9 +64,9 @@ La doc **no publica la lista completa** de valores de `features` ni qué feature
 
 | Cajón | Significa | Ejemplos |
 |---|---|---|
-| ✅ **Por API** | Se hace y se automatiza | Crear/editar productos y variantes · stock y precios masivos (`PATCH /products/stock-price`, ≤50 variantes) · categorías · cupones (CRUD completo) · clientes · metafields y custom fields · páginas, blog y email templates |
-| ⚠️ **Con aprobación de TN** | Se puede, pidiendo permiso primero | Shipping API (formulario) · Payments API (mail a partners) · Business Rules y App Proxy (soporte) · scripts con evento `onload` (mail a `api@`) · Labels API (plan Next + feature) |
-| 🖐️ **Solo admin web** | Existe en el panel, no en la API | Configuración de tienda (nombre, idiomas, monedas, dominios, tema) · impuestos · zonas y costos de envío nativos · medios de pago nativos · usuarios y permisos · reportes · **editar un pedido** (ítems, cantidades, precios, dirección, cliente) · reembolsos · kits |
+| ✅ **Por API** | Se hace y se automatiza | Crear/editar productos y variantes · stock y precios masivos (`PATCH /products/stock-price`, ≤50 variantes) · categorías · cupones (CRUD completo) · clientes · metafields y custom fields · páginas y blog · editar los email templates (8 tipos fijos: no se crean ni se borran) |
+| ⚠️ **Con condición previa** | Se puede, pero no por el camino estable: hace falta permiso de TN, o vive en el canal `unstable` (que puede cambiar o desaparecer sin aviso) | Shipping API (formulario) · Payments API (mail a partners) · Business Rules y App Proxy (soporte) · scripts con evento `onload` (mail a `api@`) · Labels API (plan Next + feature) · **editar un pedido** y **reembolso parcial** con `POST /orders/{id}/edit` (`unstable`) |
+| 🖐️ **Solo admin web** | Existe en el panel, no en la API | Configuración de tienda (nombre, idiomas, monedas, dominios, tema) · impuestos · zonas y costos de envío nativos · medios de pago nativos · usuarios y permisos · reportes · kits |
 | ❌ **No se puede** | Ni API ni panel, o directamente no existe | Import/export CSV por API · Invoice API (workaround: metafields `nfe`) · descancelar un pedido · borrar un pedido · editar un draft order (no hay `PUT`) · crear carritos · API de temas · analytics |
 
 Cómo se comunica un cajón que no es ✅ (detalle y respuesta modelo en `references/no-se-puede.md` §10):
@@ -75,9 +78,11 @@ Cómo se comunica un cajón que no es ✅ (detalle y respuesta modelo en `refere
 
 Forma de una respuesta bien armada, para copiar la estructura:
 
-> "Editar el precio de una línea de un pedido ya cerrado: 🖐️ **solo admin web**. La API expone `PUT /orders/{id}` únicamente para `owner_note` y `status`, y de la edición de pedidos solo deja **leer** el historial (`GET /orders/{id}/history/editions`). Opciones: lo edita alguien en el panel, o —si tiene que ser automático— se cancela el pedido y se crea uno nuevo por API, con número nuevo y sin la transacción original asociada."
+> "Editar el precio de una línea de un pedido ya cerrado: ⚠️ **se puede, pero solo en el canal `unstable`**. En `2025-03` estable, `PUT /orders/{id}` acepta únicamente `owner_note` y `status`. En `unstable`, `POST /orders/{id}/edit` agrega, modifica y quita ítems, y con `auto_partial_refund: true` es el único modo en que una app que no es de pagos devuelve plata. Dos condiciones: solo mientras **todos** los fulfillment orders estén en `unpacked`, y `unstable` puede cambiar sin aviso. Opciones: lo edita alguien en el panel, o se asume la dependencia de `unstable` con plan de contingencia."
 
-Casos límite frecuentes: los **cupones** (CRUD completo) resuelven la mayoría de los pedidos que llegan como "promociones"; las **promociones nativas** solo tienen vía comprobada por el MCP oficial, no por REST pública; y aunque la API no permita editar pedidos, **el merchant sí los edita desde el panel** — para enterarse hay que escuchar el webhook `order/edited` y releer la orden, no alcanza con `order/paid`.
+Los campos exactos del `edit` (`fulfillment_order_id` y `modify_stock` por ítem, `quantity: 0` para quitar) y el carácter asincrónico del reembolso están en `references/no-se-puede.md` §1.
+
+Casos límite frecuentes: los **cupones** (CRUD completo) resuelven la mayoría de los pedidos que llegan como "promociones"; las **promociones nativas** solo tienen vía comprobada por el MCP oficial, no por REST pública; y como el merchant también edita pedidos desde el panel, para enterarse hay que escuchar el webhook `order/edited` y releer la orden, no alcanza con `order/paid`.
 
 **Cómo resolver un pedido que no está en la tabla**, en este orden:
 
@@ -87,13 +92,13 @@ Casos límite frecuentes: los **cupones** (CRUD completo) resuelven la mayoría 
 
 Y una distinción que hay que hacer siempre antes de rediseñar nada: **un `402` masivo no es un límite de la plataforma**, es una tienda o una app impaga. La respuesta correcta es avisar del pago pendiente, no buscar otro camino técnico.
 
-**Si el pedido cae en ⚠️**, tratalo en el plan como **dependencia externa sin plazo garantizado**: el reloj del proyecto no arranca hasta que llega la habilitación, y es lo que más veces desarma un cronograma. Para pedirla bien, mandá `APP_ID`, nombre de la app, para qué tienda(s) y el caso de uso concreto (el destinatario de cada trámite está en `references/no-se-puede.md` §7).
+**Si el pedido cae en ⚠️ por aprobación**, tratalo en el plan como **dependencia externa sin plazo garantizado**: el reloj del proyecto no arranca hasta que llega la habilitación, y es lo que más veces desarma un cronograma. Para pedirla bien, mandá `APP_ID`, nombre de la app, para qué tienda(s) y el caso de uso concreto (el destinatario de cada trámite está en `references/no-se-puede.md` §7). **Si cae en ⚠️ por `unstable`**, la dependencia no es de plazo sino de estabilidad: decíselo al cliente por escrito antes de cerrar el alcance y dejá previsto el fallback manual por panel.
 
 **Alerta de planificación para cualquier cosa que dependa de scripts inyectados:** la doc confirma migración obligatoria a **NubeSDK para scripts de checkout**. Además circula —por comunicación a partners, **no** presente en la doc pública— que desde el **30/08/2026** las apps que inyectan scripts sin NubeSDK no reciben instalaciones nuevas y desde el **30/10/2026** empieza la desinstalación progresiva, alcanzando también a apps privadas con `write_scripts`. Verificalo con Partner Support antes de citárselo a un cliente, pero **no diseñes features nuevas sobre `POST /scripts` sin plan de migración**.
 
 ## Paso 2 — Ejecutar
 
-**Lectura: libre.** Paginar, filtrar y reportar no requiere confirmación. Usá `--paginate` y presupuestá el tiempo (2 req/s: 5.000 productos ≈ 25 s; 20.000 órdenes ≈ 100 s). Tres cosas que rompen recorridos silenciosamente:
+**Lectura: libre.** Paginar, filtrar y reportar no requiere confirmación. Usá `--paginate` y presupuestá el tiempo (2 req/s: 5.000 productos ≈ 25 s; 20.000 órdenes particionadas por fecha ≈ 100 s). Tres cosas que rompen recorridos silenciosamente:
 
 - **`GET /orders` corta en 10.000 ítems por query.** Particionar con `created_at_min` / `created_at_max`, nunca traer "todo el histórico" de una.
 - **Tienda Nube clampea `per_page` sin avisar.** Por eso el corte de un recorrido se compara contra el tamaño real de la página 1, no contra el `per_page` pedido — el script ya lo hace.
@@ -123,7 +128,7 @@ Para un cambio masivo de catálogo, elegí el endpoint antes de armar el lote:
 |---|---|---|
 | Solo precio y/o stock, de muchas variantes de muchos productos | `PATCH /products/stock-price` | **50 variantes** contando todo el batch (`422` si te pasás) |
 | Cualquier otro campo de variantes de **un** producto | `PATCH /products/{id}/variants` | Peso del payload, no cantidad fija |
-| Campos del producto (nombre, descripción, SEO, categorías) | `PUT /products/{id}` | Uno por request — ver la incógnita de más abajo |
+| Campos del producto (nombre, descripción, SEO, categorías) | `PUT /products/{id}` | Uno por request — hace merge: omitir un campo es seguro, mandarlo vacío borra |
 | Leer el estado previo de muchos productos por id | `GET /products?ids=` | **30 ids** por request |
 
 Ante un error a mitad de un lote: **no relanzar el lote entero**. Identificar qué ids se aplicaron, rehacer el diff contra el estado actual y correr solo el resto. `PATCH /products/stock-price` devuelve `success` **por variante**: un lote puede quedar aplicado a medias, así que leé el resultado registro por registro en vez de asumir que un `200` significa que entró todo.
@@ -140,13 +145,13 @@ Backup: backups/precios-2026-08-18/
 Cuatro decisiones que se toman al principio y son caras de revertir:
 
 - **Los scopes se piden completos de entrada.** Un scope de `write` implica su `read`, y hay herencias automáticas (`read_products` o `*_shipping` traen `read_locations`; `read_orders` trae `read_fulfillment_orders`). Tabla completa en `references/api-map.md` §5.
-- **Agregar un scope después obliga a que el merchant vuelva a autorizar**, y ese token nuevo invalida el anterior: planificalo como una reinstalación coordinada tienda por tienda, refrescando los tokens guardados en el mismo momento.
+- **Agregar un scope después obliga a que el merchant vuelva a autorizar**, y ese token nuevo invalida el anterior (documentado para las aplicaciones a medida; **[incierto]** en apps de partner — `references/api-map.md` §2): planificalo como una reinstalación coordinada tienda por tienda, refrescando los tokens guardados en el mismo momento.
 - **Los access tokens no expiran** (no hay refresh token): se invalidan solo al generar uno nuevo o si el merchant desinstala. Si dejó de andar, hay que reinstalar.
 - **Desinstalar la app borra lo que la app creó**: shipping carriers, payment providers, webhooks y scripts. Productos, categorías, metafields y custom fields quedan. Reinstalar **no** los restaura: hay que recrearlos sin duplicar.
 
 ## Guardarraíles (aplicalos sin que te los pidan)
 
-Resumen accionable; el catálogo completo con el porqué de cada uno está en `references/operaciones-peligrosas.md`.
+Resumen accionable; el porqué y el antídoto de cada operación están en `references/operaciones-peligrosas.md`, y el detalle de los campos por idioma en `references/api-map.md` §2.
 
 | Regla | Por qué |
 |---|---|
@@ -155,15 +160,17 @@ Resumen accionable; el catálogo completo con el porqué de cada uno está en `r
 | **Nunca mandar un body parcial** a `PUT /{entidad}/{id}/custom-fields/values` | Sobrescribe: lo que no venga se desasocia. `GET` → merge en memoria → set completo |
 | **`POST /orders/{id}/cancel` con `restock` y `email` explícitos** | Ambos son `true` por default: cancelar "en silencio" manda mail real al comprador y mueve inventario. Es irreversible |
 | **`notify_customer: false`** en `PATCH` de fulfillment order salvo que notificar sea el pedido | El default del campo es `false`, pero los ejemplos de la doc lo muestran en `true`: copiar el ejemplo notifica |
-| **`DELETE` fuera de alcance** salvo pedido expreso y por escrito | No hay restauración documentada para ningún recurso. Preferir lo reversible: producto → `visibility: "hidden"`; cupón → `valid: false` |
-| **Lotes chicos y espaciados** | Bucket de 40 que drena a 2 req/s por par (tienda, app); lo que excede **se pierde, no se encola**. En variantes el costo es el peso del payload: ante `429`, mandar menos variantes por request, no esperar más |
-| **`stock` entero ≥ 0** validado antes de mandar | `stock: ""` (o `null` en `POST /variants/stock` con `action: replace`) es **stock infinito**, sin error visible |
+| **`DELETE` fuera de alcance** salvo pedido expreso y por escrito | No hay restauración documentada para ningún recurso. Preferir lo reversible: producto → `visibility: "hidden"`; cupón → `valid: false` (la doc no confirma que sea escribible: verificar en demo) |
+| **Lotes chicos y espaciados** | Bucket de 40 que drena a 2 req/s por par (tienda, app); el exceso **se encola mientras el bucket tenga lugar** y recién ahí empieza el `429` (50 de golpe = 40 encoladas + 10 perdidas). En variantes el costo es el peso del payload: ante `429`, mandar menos variantes por request, no esperar más |
+| **`stock` entero ≥ 0** validado antes de mandar | `stock: ""` (o `null` en `POST /products/{id}/variants/stock` con `action: replace`) es **stock infinito**, sin error visible |
+| **El precio se escribe en la variante, nunca en el producto** | Todo producto tiene al menos una variante aunque el panel no la muestre. Mandar `price` en `PUT /products/{id}` **no hace nada y no devuelve error**: el precio va en `PUT /products/{pid}/variants/{vid}`. Falla silenciosa clásica de un lote de precios |
+| **`price` es el precio tachado; `promotional_price` es lo que paga el cliente** | Está invertido respecto de Shopify, y `compare_at_price` no existe acá. Confundirlos publica el precio de oferta como precio de lista (y al revés) en todo el catálogo tocado. `promotional_price: null` = sin oferta; `price: null` en una variante = "consultar precio", no gratis |
 | **Nunca `published` y `visibility` juntos** | `422` y ese producto queda sin actualizar mientras el resto del lote sí |
 | **Handlers de webhook idempotentes** | Sin garantía de orden y con entregas duplicadas; timeout de 3 s, hasta 16 reintentos en 48 h |
 | **`name`, `description`, `handle` y `seo_*` son objetos por idioma** | Un string plano se aplica a **todos** los idiomas de la tienda. En una tienda multi-idioma eso pisa la traducción sin avisar |
 | **Órdenes creadas por API no reservan stock** salvo `inventory_behaviour: claim` | El default es `bypass`: el inventario queda inflado y la tienda sobrevende |
 
-**Una incógnita que cambia cómo se escribe un producto.** La doc describe `PUT /products/{id}` como reemplazo y solo garantiza un comportamiento destructivo puntual (`categories: []` borra la categoría); no dice qué pasa con `variants` ni `images` cuando se omiten. La experiencia del equipo apunta a que hace **merge**, pero es evidencia práctica, no contrato. **Hasta verificarlo, tratá todo `PUT /products/{id}` como reemplazo**: mandá el objeto completo del `GET` previo con los cambios aplicados, u omití explícitamente las colecciones. El método de verificación en tienda demo está en `references/operaciones-peligrosas.md` → Incógnitas.
+**Cómo se escribe un producto sin romper lo que no tocás.** `PUT /products/{id}` **hace merge de los campos omitidos** — la doc lo dice explícitamente para la categoría ("si querés mantener la categoría actual, debés incluir el `category_id` o bien **omitir** el campo"), y el ejemplo canónico devuelve el array `variants` intacto. Lo destructivo es mandar la colección **vacía** (`categories: []` borra) y `PUT /products/{id}/variants`, la colección de variantes, que sí es reemplazo total. Regla práctica: omití lo que no cambiás, nunca lo mandes vacío.
 
 ## Navegación de referencias
 

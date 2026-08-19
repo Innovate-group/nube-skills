@@ -30,6 +30,7 @@ caracteres.
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import sys
@@ -65,6 +66,11 @@ MIN_INTERVAL = 0.5
 REMAINING_FLOOR = 5
 # Tope de sueño para no colgarse ante un header de reset absurdo.
 MAX_SLEEP = 60.0
+
+# Fallas de transporte reintentables. No alcanza con URLError: un timeout de
+# lectura levanta socket.timeout y una respuesta truncada levanta
+# http.client.IncompleteRead, y ninguna de las dos es URLError.
+NETWORK_ERRORS = (urlerror.URLError, OSError, http.client.HTTPException)
 
 EPILOG = """\
 Ejemplos:
@@ -171,7 +177,9 @@ def explain_status(status, payload, raw_text):
         400: ("Bad Request — falta el header User-Agent o el JSON del body es "
               "inválido."),
         401: ("Unauthorized — el access token es inválido, fue revocado o la "
-              "app se desinstaló de la tienda."),
+              "app se desinstaló de la tienda. El header de auth NO es la "
+              "causa: 'Authorization: Bearer' y 'Authentication: bearer' "
+              "funcionan los dos."),
         402: ("Payment Required — la tienda o la app están impagas: la API "
               "está SUSPENDIDA y devuelve 402 en todos los endpoints hasta "
               "regularizar el pago. No es un problema del request."),
@@ -189,7 +197,13 @@ def explain_status(status, payload, raw_text):
               "tienda-app, ×10 en planes Next/Evolution) y se agotaron los "
               "reintentos. Las requests excedidas se pierden, no se encolan."),
     }
-    if status in causas:
+    if status == 0:
+        # No hubo respuesta HTTP: falló el transporte (DNS, TLS, conexión
+        # rechazada, timeout de lectura, respuesta truncada).
+        base = ("No se pudo completar la request: no hubo respuesta de la API. "
+                "Revisá conectividad, --base-url y que la request no exceda el "
+                "timeout de %ds." % DEFAULT_TIMEOUT)
+    elif status in causas:
         base = causas[status]
     elif 500 <= status < 600:
         base = ("Error del lado de Tienda Nube (%d). Se agotaron los "
@@ -198,7 +212,8 @@ def explain_status(status, payload, raw_text):
         base = "La API respondió %d." % status
 
     detalle = format_error_payload(payload, raw_text)
-    return "HTTP %d — %s%s" % (status, base, detalle)
+    prefijo = "HTTP %d — " % status if status else "Sin respuesta — "
+    return prefijo + base + detalle
 
 
 def format_error_payload(payload, raw_text):
@@ -209,7 +224,7 @@ def format_error_payload(payload, raw_text):
     """
     if payload is None:
         texto = (raw_text or "").strip()
-        return "\n  respuesta: " + texto[:500] if texto else ""
+        return "\n  detalle: " + texto[:500] if texto else ""
 
     lineas = []
     if isinstance(payload, dict):
@@ -309,13 +324,12 @@ class Client:
         self.user_agent = user_agent
         self.max_retries = max_retries
         self.timeout = timeout
-        # La doc oficial muestra 'Authorization: Bearer' en las páginas nuevas
-        # y 'Authentication: bearer' en las viejas. Se manda el segundo (es el
-        # que funciona en los proyectos propios) y ante un 401 se reintenta una
-        # vez con el primero.
-        self.auth_header = "Authentication"
-        self.auth_prefix = "bearer"
-        self.auth_fallback_usado = False
+        # 'Authorization: Bearer' y 'Authentication: bearer' funcionan los dos,
+        # en v1 y en 2025-03 (verificado contra la API real). Se manda el que
+        # muestra la doc de 2025-03 y NO hay fallback al otro: sería código
+        # muerto. Un 401 siempre es token inválido, nunca header equivocado.
+        self.auth_header = "Authorization"
+        self.auth_prefix = "Bearer"
         self.throttle = Throttle("%s|%s|%s" % (self.base_url, self.api_version, self.store_id))
 
     # -- construcción ------------------------------------------------------
@@ -376,15 +390,16 @@ class Client:
             self.throttle.wait()
             try:
                 status, headers, texto = self._perform(method, url, body_bytes)
-            except urlerror.URLError as exc:
+            except NETWORK_ERRORS as exc:
+                motivo = getattr(exc, "reason", None) or exc
                 if intento < self.max_retries:
                     espera = 2 ** intento
                     warn("error de red (%s); reintento %d/%d en %ds"
-                         % (exc.reason, intento + 1, self.max_retries, espera))
+                         % (motivo, intento + 1, self.max_retries, espera))
                     self.throttle.sleep(espera, "reintento de red")
                     intento += 1
                     continue
-                raise ApiError(0, url, None, "error de red: %s" % exc.reason)
+                raise ApiError(0, url, None, "%s: %s" % (type(exc).__name__, motivo))
 
             if status != 429:
                 # En un 429 la espera la maneja el propio reintento.
@@ -395,14 +410,6 @@ class Client:
                     payload = json.loads(texto)
                 except ValueError:
                     payload = None
-
-            if status == 401 and not self.auth_fallback_usado:
-                self.auth_fallback_usado = True
-                self.auth_header = "Authorization"
-                self.auth_prefix = "Bearer"
-                warn("401 con 'Authentication: bearer'; reintentando una vez "
-                     "con 'Authorization: Bearer'")
-                continue
 
             if status == 429:
                 if intento < self.max_retries:
@@ -440,6 +447,7 @@ class Client:
         base_params["per_page"] = per_page
         tam_pagina_1 = None
         pagina = 1
+        leidas = 0
         while True:
             consulta = dict(base_params)
             consulta["page"] = pagina
@@ -457,6 +465,7 @@ class Client:
                     "la respuesta de %s no es una colección paginable "
                     "(no es un array ni trae 'results')" % resp.url)
             items.extend(actuales)
+            leidas += 1
             if tam_pagina_1 is None:
                 tam_pagina_1 = len(actuales)
                 if tam_pagina_1 == 0:
@@ -464,7 +473,7 @@ class Client:
             if len(actuales) < tam_pagina_1:
                 break
             pagina += 1
-        return items, pagina
+        return items, leidas
 
 
 # --------------------------------------------------------------------------

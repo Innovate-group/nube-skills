@@ -22,18 +22,19 @@ Regla transversal antes de cualquier escritura: `GET` del recurso → guardar el
 - **Qué destruye:** toda variante que no venga en el body, con su stock por location, su SKU y sus custom fields asociados.
 - **Por qué pasa:** la doc lo dice explícito: *"all the variants sent in the request will be the current and only variants for the Product"* y cada variante se identifica **por su combinación de `values`, no por `id`**. Renombrar un talle (`"L"` → `"Large"`) no renombra: crea una variante nueva y borra la vieja. Un script que arma el body desde una fuente parcial (un CSV con 3 de 8 talles) borra las otras 5.
 - **Antídoto:** usar **`PATCH /products/{id}/variants`**, que exige `id` por variante, solo actualiza y **no crea ni borra**. El `PUT` de colección se reserva para cuando el objetivo declarado *es* reemplazar todo el set, con backup del `GET` previo.
+- **Ojo con el mito inverso:** el riesgo vive **solo** en este endpoint. `PUT /products/{id}` (el producto) **no** borra las variantes al omitirlas: el ejemplo canónico de la doc hace `PUT` con `{categories, id, published}` y la respuesta 200 devuelve el array `variants` intacto. Para campos omitidos, el `PUT` del producto **mergea**.
 
 ### 2. `PUT /products/{product_id}/custom-fields/values`
 
-- **Qué destruye:** las asociaciones de custom fields del producto que no vengan en el body.
-- **Por qué pasa:** la FAQ oficial dice que ese endpoint **sobrescribe** los custom fields asociados al producto; mandar `value: null` es justamente la forma documentada de desasociar. Un body armado solo con el campo que se quiere tocar borra el resto.
+- **Qué destruye:** según la FAQ oficial ese endpoint **sobrescribe** los custom fields asociados al producto, así que lo que no venga en el body queda fuera.
+- **Por qué pasa:** un body armado solo con el campo que se quiere tocar. (La misma FAQ documenta `value: null` como la forma de desasociar un campo puntual, lo que deja abierto cuánto borra realmente un body parcial; hasta verificarlo en demo, asumir la lectura destructiva.)
 - **Antídoto:** `GET` de los valores actuales, mergear en memoria y mandar el set completo. Nunca mandar un body parcial.
 
-### 3. `PUT /products/{id}` con `categories: []`
+### 3. `PUT /products/{id}` con `categories`
 
-- **Qué destruye:** la categorización del producto (queda huérfano y desaparece de la navegación del storefront).
-- **Por qué pasa:** documentado: *"if the product has an associated category, and the categories field is sent empty, the product ends up without a category"*. Serializadores que mandan todos los campos del modelo emiten `[]` cuando la lista viene vacía en origen.
-- **Antídoto:** **omitir el campo** (omitir ≠ mandar vacío). Si hay que conservar, incluir los `category_id` actuales tomados del `GET` previo.
+- **Qué destruye:** la categorización del producto. Con `categories: []` queda huérfano y desaparece de la navegación del storefront; con una lista parcial pierde las categorías que no vinieron, porque el campo **reemplaza, no agrega**.
+- **Por qué pasa:** dos motivos. (a) Documentado: *"if the product has an associated category, and the categories field is sent empty, the product ends up without a category"* — y los serializadores que mandan todos los campos del modelo emiten `[]` cuando la lista viene vacía en origen. (b) **El campo es asimétrico:** se escribe como array de IDs enteros (`{"categories": [1234, 4567]}`) pero el `GET` lo devuelve como array de objetos completos (`[{id, name, handle, parent, subcategories, ...}]`). Un read-modify-write ingenuo reinyecta los objetos tal cual los leyó y rompe.
+- **Antídoto:** **omitir el campo** cuando no se toca (omitir es seguro, el `PUT` mergea; omitir ≠ mandar vacío). Si hay que modificar, extraer los enteros del `GET` previo (`[c["id"] for c in producto["categories"]]`), aplicar el alta o la baja sobre esa lista y mandar el set completo de IDs.
 
 ### 4. `DELETE` de cualquier recurso — sin papelera
 
@@ -71,9 +72,10 @@ Regla transversal antes de cualquier escritura: `GET` del recurso → guardar el
 
 ### 9. Escrituras masivas contra el rate limit
 
-- **Qué destruye:** la integridad del lote: al pasarse del bucket la API responde `429` y **esas requests se pierden, no se encolan** (ejemplo de la doc: encolar 50 requests de golpe → 10 se pierden). Queda una actualización parcial sin registro de qué entró.
+- **Qué destruye:** la integridad del lote. El exceso **se encola** mientras el bucket (40) tenga lugar, y lo que no entra se pierde con `429`: mandar 50 de golpe deja **40 encoladas y 10 perdidas**. Queda una actualización parcial sin registro de qué entró.
 - **Por qué pasa:** leaky bucket de 40 de burst que drena a **2 req/s** por par (tienda, app); ×10 en planes Next/Evolution. Un `for` sin throttle se pasa en el ítem 41.
 - **Antídoto:** ejecutar siempre con el cliente que respeta 2 req/s y reintenta los `429` (`scripts/tn-api.py`), y cerrar con un reporte explícito de aplicados/fallidos.
+- **No hay red de contención para el reintento:** la API **no tiene idempotency key ni header de request-id**. Una request que cortó por timeout pudo haberse aplicado igual, y reintentarla a ciegas duplica la escritura. La reejecución segura se resuelve del lado propio: registrar cada recurso escrito (con su id) antes de reintentar, y hacer que el script pueda retomar desde ahí.
 
 ### 10. Cambiar los scopes de la app
 
@@ -95,6 +97,7 @@ Regla transversal antes de cualquier escritura: `GET` del recurso → guardar el
 
 - **Qué rompe:** el reparto del inventario. Con multi-location activo, `variant.stock` **lee el total de todas las locations** pero al escribir solo *"we'll update the first inventory_level for that variant"*. Un read-modify-write vuelca todo el total en la primera location.
 - **Por qué pasa:** el campo sigue existiendo por compatibilidad y las integraciones viejas lo siguen usando.
+- **Y mandar los dos no es un seguro:** si el body trae `stock` **e** `inventory_levels` a la vez, el `stock` de nivel superior **se ignora en silencio** (gana `inventory_levels`). El "por las dudas mando ambos" no avisa cuál quedó.
 - **Antídoto:** chequear `features` en `GET /store`; con `inventory-levels` escribir siempre por `inventory_levels` con `location_id` explícito.
 
 ### 13. `PATCH /products/stock-price` sin `location_id`
@@ -104,7 +107,7 @@ Regla transversal antes de cualquier escritura: `GET` del recurso → guardar el
 
 ### 14. Mandar `published` y `visibility` juntos
 
-- **Qué rompe:** la request entera falla con `422 "Cannot send both 'published' and 'visibility'"`. En un lote, ese producto queda sin actualizar mientras el resto sí.
+- **Qué rompe:** la request entera falla con `422 "Cannot send both 'published' and 'visibility'"` (vigente desde el 2026-07-28). En un lote, ese producto queda sin actualizar mientras el resto sí.
 - **Por qué pasa:** `published` es el campo legacy derivado de `visibility`; los payloads copiados de un `GET` traen los dos.
 - **Antídoto:** mandar uno solo — `visibility` (`visible` / `unlisted` / `hidden`) para distinguir oculto de no-listado.
 
@@ -117,7 +120,7 @@ Regla transversal antes de cualquier escritura: `GET` del recurso → guardar el
 
 - **Qué rompe:** el estado del sistema que consume los eventos (dobles fulfillments, dobles mails, contadores inflados).
 - **Por qué pasa:** la doc lo declara: sistema distribuido, sin garantía de orden de procesamiento, y mensajes que pueden llegar varias veces. Timeout de **3 segundos** esperando un 2XX, con reintentos (uno inmediato, luego ~5, 10 y 15 minutos, después backoff ×1,4 dentro de 48 h, **hasta 16 intentos**).
-- **Antídoto:** todo handler **idempotente** (deduplicar por el contenido del mensaje), responder 2XX rápido y procesar asincrónico, verificar el HMAC `x-linkedstore-hmac-sha256`.
+- **Antídoto:** todo handler **idempotente**, deduplicando por el evento lógico y **no** por el cuerpo — la doc avisa que dos mensajes de cuerpo idéntico pueden ser eventos distintos y que un reintento llega con el cuerpo cambiado (trae el contador de reintentos). Además: responder 2XX rápido y procesar asincrónico, y verificar el HMAC `x-linkedstore-hmac-sha256`.
 
 ### 17. Endpoints legacy de fulfillment en tiendas multi-location
 
@@ -128,6 +131,42 @@ Regla transversal antes de cualquier escritura: `GET` del recurso → guardar el
 
 - **Qué destruye:** *"When a promotions app is uninstalled, we will permanently remove all the promotions created for that store"*, y el proceso es asincrónico (puede haber demora). Además, la callback URL de Discounts **no se puede borrar** una vez registrada.
 - **Antídoto:** avisarlo antes de cualquier desinstalación; exportar las promociones (`GET /promotions`) como respaldo, sabiendo que recrearlas es trabajo manual.
+
+### 19. Escribir `price` (o `stock`, o `sku`) en el producto y no en la variante
+
+- **Qué rompe:** nada cambia, y el script reporta éxito. Un producto **sin variantes visibles igual tiene una variante interna**: ahí viven el precio, el stock y el SKU. `PUT /products/{id}` con `price` devuelve `200` y **se ignora en silencio**.
+- **Por qué pasa:** las lecturas muestran el precio a nivel producto, así que parece escribible. No hay error, no hay warning.
+- **Antídoto:** escribir siempre en la variante — `PUT /products/{pid}/variants/{vid}` o `PATCH /products/stock-price` — tomando el `vid` del `GET` del producto. Cerrar con un `GET` de verificación: si el valor no cambió, el write fue al lugar equivocado.
+
+### 20. `price` y `promotional_price` están invertidos respecto de Shopify
+
+- **Qué rompe:** el precio de venta de todo el catálogo. `price` es el precio que se muestra **tachado** y `promotional_price` es **lo que efectivamente paga el cliente**. Un port de código Shopify que escribe el precio final en `price` **le sube el precio a la tienda entera**, sin error. `compare_at_price` **no existe** en esta API.
+- **Por qué pasa:** el nombre `price` sugiere "precio de venta" y todo el ecosistema Shopify refuerza esa lectura.
+- **Además:** `promotional_price: null` = sin oferta, pero **`price: null` en una variante significa "consultar precio"** — el storefront abre un contacto en vez del checkout, no es ni gratis ni "sin precio". Y los precios **se leen como string** (`"10.00"`) y **se escriben como número**: el tipado tiene que tolerar ambas formas y los diffs no pueden comparar string contra float.
+- **Antídoto:** dry-run con las dos columnas (`price` y `promotional_price`) antes y después. Si el pedido es "poner en oferta a X", va `promotional_price: X` dejando `price` como está.
+
+### 21. `parent: 0` en categorías raíz y `subcategories` de solo lectura
+
+- **Qué rompe:** el árbol de categorías. La doc dice que una categoría raíz tiene `parent: null`, pero **v1 devuelve `0`**: un `if parent is None` clasifica mal las raíces y un recorrido que "corrige" la jerarquía reparenta ramas enteras.
+- **Y `subcategories` es de solo lectura:** mandarlo en un `PUT` no arma nada. La jerarquía se define seteando `parent` en el **hijo**.
+- **Antídoto:** tratar `parent in (None, 0)` como raíz; para mover una categoría, `PUT` sobre el hijo con su nuevo `parent`, nunca sobre el padre.
+
+### 22. Buscar por SKU para después escribir
+
+- **Qué rompe:** se escribe sobre el producto equivocado. **El SKU no es único**: la API no valida duplicados (no hay `422`) y `GET /products/sku/{sku}` devuelve *"el primer producto"* que matchea.
+- **Antídoto:** no usar el SKU como clave de escritura. Resolver a `id` una vez, guardarlo y trabajar con el `id`. Antes de un backfill por SKU, listar todos los matches y frenar si hay repetidos.
+
+### 23. `products.id` no entra en un int32
+
+- **Qué rompe:** el id se trunca o desborda, y la escritura cae en otro recurso o falla con un `404` desconcertante. Los ids de producto **ya superan el rango de int32**.
+- **Antídoto:** int64 / bigint en todo el pipeline — modelos, columnas de la base y cualquier planilla intermedia — y serializar los ids como enteros de 64 bits o como string.
+
+### 24. Imágenes: campos excluyentes, límites duros y re-render silencioso
+
+- **Qué rompe:** la imagen no queda como se subió, o el `422` apunta al campo equivocado. `src` (URL que Tiendanube descarga) y `attachment` (base64) + `filename` son **excluyentes**; si falta el input, el `422` culpa a `src` aunque el plan fuera usar `attachment`.
+- **Límites:** <10 MB por imagen, formatos `.gif .jpg .png .webp`, **máx 250 por producto** y **≤9 inline** al crear el producto.
+- **Re-render:** un **WebP se convierte a JPEG a 1024** — un pipeline de thumbnails que espera el archivo original recibe otro formato y otras dimensiones.
+- **Antídoto:** crear el producto con pocas imágenes y sumar el resto con `POST /products/{id}/images`; no derivar thumbnails asumiendo el formato subido; validar tamaño y cantidad antes de mandar, porque el `DELETE` de imagen sí es definitivo.
 
 ---
 
@@ -142,16 +181,15 @@ Consecuencia operativa: reinstalar **no** restaura webhooks ni carriers; hay que
 - **Clientes con órdenes no se borran:** `DELETE /customers/{id}` devuelve `422 "Cannot delete a customer with orders"`.
 - **Locations con stock no se borran:** el `DELETE` exige que la location no tenga inventory levels asignados y que no sea la default.
 - **Custom fields ajenos no se borran:** el `DELETE` solo alcanza los creados por la propia app; los del merchant o de otra app quedan.
-- **`PATCH` de variantes valida antes de tocar:** si una variante no existe, no pertenece al producto o repite combinación de `values`, devuelve `422` con `duplicate_variant_ids` y no aplica nada.
+- **`PATCH` de variantes valida antes de tocar:** si una variante no existe, no pertenece al producto o repite combinación de `values`, devuelve `422` con los ids que fallaron (el ejemplo de la doc muestra `duplicate_variant_ids`) y no aplica ningún cambio.
 - **`stock_management` es de solo lectura:** no se puede desactivar el control de stock "por accidente" escribiendo ese campo.
-- **Alternativas reversibles al borrado:** productos → `visibility: "hidden"` (o `"unlisted"`) en vez de `DELETE`; categorías → `visibility: hidden`; scripts y webhooks → recrearlos es barato, pero el `DELETE` sigue siendo definitivo.
+- **Variantes con `values` mal armados no entran:** la cantidad de `values` de cada variante debe igualar la cantidad de `attributes` del producto; si no, `422 "The values has the wrong number of elements"` y no se crea nada. Agregar un atributo al producto obliga a mandar el `values` extra en **todas** las variantes.
+- **Alternativas reversibles al borrado:** productos → `visibility: "hidden"` (o `"unlisted"`) en vez de `DELETE`; categorías → `visibility: "hidden"`; scripts y webhooks → recrearlos es barato, pero el `DELETE` sigue siendo definitivo.
 
 ## Incógnitas
 
 Lo que la documentación oficial **no** define y no hay que afirmar:
 
-1. **¿`PUT /products/{id}` parcial preserva lo que no se manda?** La doc de la API describe `PUT` como modificación del producto, pero solo garantiza un comportamiento destructivo puntual: `categories` vacío **sí** borra la categoría. No dice qué pasa con `variants` ni con `images` cuando se omiten, ni si el resto de los campos se mergean. La experiencia del equipo (comentario en un proyecto propio: *"el PUT de TN hace merge, así que mandar solo `{tags}` no toca otros campos"*) apunta a merge, pero **es evidencia práctica, no contrato**.
-   **Cómo verificarlo:** en una tienda demo, `GET /products/{id}` completo → `PUT` con un solo campo (`{"name": {"es": "X"}}`) → `GET` de nuevo y diff de `variants`, `images` y `categories`. Repetir con `variants` presente pero incompleto. Hasta tener ese resultado, tratar todo `PUT /products/{id}` como si fuera reemplazo: mandar el objeto completo del `GET` previo con los cambios aplicados, u omitir explícitamente las colecciones.
-2. **¿`DELETE /categories/{id}` arrastra las subcategorías?** La categoría tiene `parent` y `subcategories`, pero la doc no dice qué pasa con los hijos ni con los productos asociados al borrar. **Verificar en demo** con un árbol de tres niveles antes de borrar nada en producción.
-3. **¿El borrado de cupones es reversible?** El recurso expone `deleted_at` (*"Date when the coupon was deleted"*), lo que sugiere borrado lógico, pero no hay endpoint documentado para restaurar ni se documenta si `valid` es escribible por `PUT /coupons/{id}`. **Verificar en demo** si `PUT` con `valid: false` desactiva el cupón; hasta entonces, tratar el `DELETE` como definitivo.
-4. **¿Hay CRUD REST del motor nativo de promociones?** La REST pública solo documenta la Discounts API de callbacks (promociones **de la app partner**). El MCP oficial expone `create_promotion` / `update_promotion` / `delete_promotion`: esa es la vía comprobada para promociones nativas. No inventar endpoints `/promotions` fuera del contexto de Discounts.
+1. **¿`DELETE /categories/{id}` arrastra las subcategorías?** La categoría tiene `parent` y `subcategories`, pero la doc no dice qué pasa con los hijos ni con los productos asociados al borrar. **Verificar en demo** con un árbol de tres niveles antes de borrar nada en producción.
+2. **¿El borrado de cupones es reversible?** El recurso expone `deleted_at` (*"Date when the coupon was deleted"*), lo que sugiere borrado lógico, pero no hay endpoint documentado para restaurar. `valid` figura como parámetro escribible en `POST /coupons` y el listado filtra por `?status=activated|deactivated`, aunque la doc de `PUT /coupons/{id}` no enumera propiedades. **Verificar en demo** si `PUT` con `valid: false` desactiva el cupón; hasta entonces, tratar el `DELETE` como definitivo.
+3. **¿Hay CRUD REST del motor nativo de promociones?** La REST pública solo documenta la Discounts API de callbacks (promociones **de la app partner**). El MCP oficial expone `create_promotion` / `update_promotion` / `delete_promotion`: esa es la vía a usar si hace falta CRUD de promociones nativas, aunque no hay REST pública equivalente que documente su comportamiento. No inventar endpoints `/promotions` fuera del contexto de Discounts (ahí `GET /promotions` existe, pero solo lista las creadas **por la propia app**).
