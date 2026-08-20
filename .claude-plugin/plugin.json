@@ -1,6 +1,6 @@
 {
   "name": "nube-skills",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Skills y comandos de Claude Code para Tienda Nube: temas sectionable (Ipanema, Fork Workflow) y backoffice (Admin API)",
   "author": { "name": "Innovate Group" }
 }

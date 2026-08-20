@@ -14,9 +14,30 @@ Preguntale al dev todo lo que falte, en una sola tanda:
 
 - Nombre del cliente (si no vino como argumento).
 - Carpeta destino del proyecto (si ya estás parado en ella, confirmalo).
-- Links de Figma: boceto **desktop**, boceto **mobile** y **ui-kit**. El ui-kit es obligatorio para las skills de desarrollo (`nube-skills-section` lo usa siempre); si todavía no existe, dejalo anotado como pendiente en el CLAUDE.md.
+- **Los nodos del ui-kit** (ver abajo). Es lo único de diseño que se pide en el kickoff.
 - ¿Instalación nueva o ya existe una en la tienda? Recordá el límite: **máximo 2 instalaciones por tienda** (1 productiva + 1 borrador).
 - ¿Crear también un repo privado en GitHub (org `Innovate-group`) y pushear? (opcional)
+
+**No pidas los bocetos de las páginas.** Los diseños de home, producto, categoría y demás se van pasando **sección a sección** durante el desarrollo, cuando el dev invoca `nube-skills-section` con el nodo puntual. Pedirlos ahora no sirve de nada.
+
+### Los nodos del ui-kit
+
+El ui-kit **no es un boceto**: es el sistema visual, y vive repartido en varios nodos de Figma. Pedile al dev el link ("Copy link to selection") de cada uno de los que existan:
+
+| Nodo | Para qué lo usan las skills |
+|---|---|
+| **Colores / paleta** | Mapear cada color del diseño a su token con nombre en vez de copiar el hex suelto |
+| **Tipografías / escala** | Familias, pesos y tamaños con nombre; evita inventar una escala por sección |
+| **Botones** | Variantes y estados (primario, secundario, hover, disabled) |
+| **Formularios / inputs** | Campos, labels, mensajes de error |
+| **Cards / product card** | La pieza que más se repite en un ecommerce |
+| **Iconografía** | Set de íconos y su tamaño base |
+| **Espaciados / grid** | Escala de espaciado, ancho de contenedor y columnas |
+
+Reglas al pedirlos:
+- Si el ui-kit está todo en **una sola página** de Figma, alcanza con el link de esa página, pero anotá igual qué contiene.
+- Si **falta** alguno, anotalo como pendiente en el `CLAUDE.md` en vez de inventarlo: cuando aparezca, se agrega.
+- Si el proyecto **no tiene ui-kit**, decilo explícito: el sistema visual pasa a ser el del propio tema (`layouts/resources/style-tokens.tpl` + `config/settings_schema.json`) y las secciones se van a construir contra esos tokens.
 
 ## 2. Prerrequisitos
 
@@ -54,14 +75,40 @@ Creá `CLAUDE.md` en la raíz con este template completado (es la memoria compar
 - **Tema base:** ipanema — versión y estado de fork en `manifest.json`
 - **Installation ID:** <id> (<productiva | borrador>)
 - **Preview:** correr `tiendanube theme preview` (URL con `?theme_installation_id=<id>`)
-- **Figma boceto:** <link desktop> · <link mobile>
-- **UI-kit:** <link>  ← lo usa nube-skills-section; no borrar esta línea
 - **Dev loop:** `tiendanube theme watch` (auto-push + navegador con reload)
 - **Regla de fork:** sin fork solo son editables `templates/**`, `custom/**` y
   `config/settings_data.json` — `theme push` omite el resto en silencio.
+
+## UI-kit
+
+Sistema visual del rediseño. **`nube-skills-section` lee esta tabla en cada sección
+que construye** — no borrarla ni renombrar el encabezado.
+
+| Nodo | Link |
+|---|---|
+| Colores / paleta | <link o `pendiente`> |
+| Tipografías / escala | <link o `pendiente`> |
+| Botones | <link o `pendiente`> |
+| Formularios / inputs | <link o `pendiente`> |
+| Cards / product card | <link o `pendiente`> |
+| Iconografía | <link o `pendiente`> |
+| Espaciados / grid | <link o `pendiente`> |
+
+## Bocetos por sección
+
+Se completan **sobre la marcha**: cada vez que se construye una sección, anotá acá
+su nodo, así queda trazable qué diseño originó qué código.
+
+| Sección | Desktop | Mobile |
+|---|---|---|
+| (vacío al arrancar) | | |
 ```
 
-Sumá al template cualquier dato propio del cliente que el dev te haya dado (idiomas/locales requeridos, integraciones, fechas).
+Reglas al completarlo:
+- Poné `pendiente` en los nodos del ui-kit que todavía no existan — nunca inventes un link.
+- Si el proyecto no tiene ui-kit en Figma, reemplazá esa tabla por una línea que lo diga y aclare que el sistema visual son los tokens del tema (`layouts/resources/style-tokens.tpl` + `config/settings_schema.json`).
+- La tabla de bocetos arranca **vacía**: se llena sección por sección durante el desarrollo.
+- Sumá cualquier dato propio del cliente que el dev te haya dado (idiomas/locales requeridos, integraciones, fechas).
 
 ## 6. Repo en GitHub (solo si el dev lo pidió en el paso 1)
 

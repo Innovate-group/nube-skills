@@ -27,7 +27,7 @@ Ante la duda entre bug y setting, mirá el `{% schema %}`: si el valor del dise�
 2. **URL de preview:** `tiendanube theme preview` la imprime, con la forma `https://<tienda>.mitiendanube.com?theme_installation_id=<id>`. Acepta `--theme-id <id>` para apuntar a otra instalación y `--published` para la productiva. También podés armar la URL con el `installation_id` de `manifest.json`. Solo la ves vos; no afecta a los visitantes.
 3. **La preview refleja lo último:** si `forked: false` en `manifest.json`, `push` y `watch` solo suben `templates/**`, `custom/**` y `config/settings_data.json`; `sections/`, `blocks/`, `snippets/`, `layouts/`, `static/`, las traducciones y `config/settings_schema.json` se omiten **en silencio** — podrías estar auditando una versión vieja del código. Verificalo antes de reportar nada.
 4. **MCP de Chrome DevTools** disponible. Si `theme watch` abrió su propio navegador, ese no es necesariamente el que maneja el MCP: para evitar confusión, corré `theme watch --no-browser` y manejá la navegación desde acá.
-5. **Referencia de diseño:** el nodo de Figma (desktop y mobile) o los artboards del canvas si se construyó sin boceto. Sin referencia no hay QA visual: pedila.
+5. **Referencia de diseño:** buscala primero en la tabla `## Bocetos por sección` del `CLAUDE.md` — `nube-skills-section` anota ahí el nodo de cada sección que construye. Si no está, pedile al dev el nodo de Figma (desktop y mobile) o el link del canvas si se construyó sin boceto, y **sumalo a esa tabla**. Sin referencia no hay QA visual.
 6. **Alcance y estados:** ¿una sección, una página o el tema entero? ¿Qué estados interactivos declaró el dev al construirla? El reporte cambia de tamaño y de foco.
 
 ## Paso 1 — Capturar los dos viewports

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 — 2026-08-19
+
+- `/nube-skills:kickoff` ya no pide los bocetos de las páginas: esos se pasan **sección a sección** durante el desarrollo. Ahora pide lo único que sí se necesita desde el arranque, **los nodos del ui-kit** — que no es un boceto sino un conjunto de nodos (colores, tipografías, botones, formularios, cards, iconografía, espaciados/grid).
+- El `CLAUDE.md` del proyecto pasa a tener dos tablas: `## UI-kit` (los nodos del sistema visual, con `pendiente` para los que falten) y `## Bocetos por sección` (arranca vacía y se llena a medida que se construye).
+- `nube-skills-section` lee la tabla de UI-kit y carga **solo los nodos que la sección necesita**, en vez de todo el ui-kit cada vez; al terminar, anota el boceto usado en la tabla de bocetos.
+- `nube-skills-qa` toma su referencia de esa misma tabla en lugar de pedirla siempre.
+
 ## 1.1.0 — 2026-08-19
 
 - Nueva skill `nube-skills-admin`: experto en el backoffice y la Admin API (`2025-03`). Aporta lo que ninguna fuente tiene junto — el mapa de **qué no se puede** (pedidos casi inmutables, sin API de reembolsos ni de configuración de tienda, sin usuarios ni reportes), los **guardarraíles** de las operaciones destructivas (el `PUT` de variantes que borra las ausentes, `categories: []`, `cancel` con restock y mail por default) y un **protocolo de escritura** en cinco tiempos: dry-run, diff, backup, confirmación y ejecución con control de rate limit.
