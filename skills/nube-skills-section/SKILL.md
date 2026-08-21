@@ -22,7 +22,8 @@ Esta skill asume el contexto de `nube-skills-themes` (anatomía de sections/bloc
    - Si un nodo figura como `pendiente`, seguí sin él y avisale al dev qué quedó sin respaldo del sistema.
    - Si **no hay tabla** de UI-kit (proyecto que no arrancó con el kickoff), preguntale al dev por los nodos y **escribí la tabla en el `CLAUDE.md`** para no volver a preguntar. Si el proyecto no tiene `CLAUDE.md`, guardalo en tu memoria persistente.
    - Si el proyecto **no tiene ui-kit** en Figma, el sistema visual son los tokens del tema (`layouts/resources/style-tokens.tpl` + `config/settings_schema.json`): construí contra esos.
-6. **Preguntas obligatorias al dev** (por sección, antes de generar):
+6. **Sync antes de escribir (el último chequeo, pegado a la primera escritura):** corré el gate del Paso 0.5 de `nube-skills-themes` — commit/stash → `git pull --ff-only` → `tiendanube theme pull` → `git diff`. El comerciante edita `templates/**` y `config/settings_data.json` desde el editor mientras vos trabajás, y `theme push` sincroniza eliminaciones: registrar la sección con un JSON template viejo **borra de la tienda las secciones que él agregó**. Si el pull trae cambios sobre lo que ibas a tocar, mostrale los dos valores al dev antes de decidir. Chequeo determinista: `python3 <carpeta-de-nube-skills-themes>/scripts/sync-check.py . --files templates/pages/<página>.json`.
+7. **Preguntas obligatorias al dev** (por sección, antes de generar):
    - ¿La sección tiene **estados interactivos** (hover, focus, activo, abierto/cerrado, animaciones)? Ninguna referencia estática los muestra —ni un screenshot de Figma ni un artboard—: si los hay, pedí los nodos o variantes de Figma de esos estados (Vía A) o una descripción escrita de cada uno (Vía B), y anotalos antes de codear.
    - ¿Querés agregar el **toggle de visibilidad interna**? (setting booleano para que la sección solo la vean usuarios logueados con email `@innovategroup` — sirve para revisar secciones en producción sin exponerlas a compradores).
 
@@ -129,6 +130,8 @@ Los valores en español salen del diseño; para los demás locales traducí con 
 
 ## Paso 4 — Registrar en la página
 
+Este paso escribe **el archivo que el comerciante edita desde el editor**. Si desde el gate del Paso 0 pasó un rato, o el dev estuvo mostrándole la tienda, **re-pulleá antes de tocar el JSON** (`tiendanube theme pull` + `git diff`) y quedate con las secciones que él haya agregado: no las borres del `order` para "dejarlo como el diseño".
+
 1. **Preset:** el `{% schema %}` de toda section nueva lleva `presets` con settings y blocks iniciales (los valores del diseño) — así el comerciante puede agregarla desde el editor.
 2. **JSON template:** agregá la entrada en `templates/pages/<página>.json` — `sections` con un id descriptivo, sus `settings`, sus `blocks` con `block_order`, y el id en el `order` de la página en la posición que indica el diseño. Si la página destino no es obvia por el contexto, preguntá cuál es antes de tocar el JSON.
 3. Si la rama fue A, este paso ES todo el trabajo: configurar la entrada del JSON con los settings que reproducen el diseño.
@@ -144,14 +147,14 @@ Los valores en español salen del diseño; para los demás locales traducí con 
    - [ ] Todo block tiene `block_attributes` en su elemento raíz.
    - [ ] Ningún texto/imagen/color hardcodeado que debiera ser setting.
    - [ ] Sin fork: confirmá que NO editaste archivos que push omite (si la rama fue B/C/D con `forked: false`, algo salió mal en el triage).
-   - [ ] La entrada del JSON template respeta `order`/`block_order` del diseño.
+   - [ ] La entrada del JSON template respeta `order`/`block_order` del diseño **y conserva las secciones que ya estaban** (ninguna entrada del comerciante quedó fuera del `order`).
    - [ ] Las 4 settings de padding (top/bottom × desktop/mobile) existen y el CSS las aplica.
    - [ ] Los estados interactivos declarados por el dev (hover, etc.) están implementados.
    - [ ] Si se pidió el toggle interno: probado logueado con email `@innovategroup` (se ve) y como visitante anónimo (no se ve).
 
 ## Reglas duras
 
-Aplican las 7 reglas duras de `nube-skills-themes` (block_attributes, snippets `_`, slots nubesdk/data-store, claves t: completas, precios en centavos, `.tpl`, límites sin fork). Propias de esta skill:
+Aplican las 8 reglas duras de `nube-skills-themes` (block_attributes, snippets `_`, slots nubesdk/data-store, claves t: completas, precios en centavos, `.tpl`, límites sin fork, **sync antes de escribir**). Propias de esta skill:
 
 1. **Settings-first sin excepciones de contenido:** textos, imágenes y CTAs jamás hardcodeados en el `.tpl`.
 2. **Imágenes solo vía `snippets/image.tpl`** — nunca un `<img>` crudo con la URL exportada de Figma ni con la imagen embebida del artboard.

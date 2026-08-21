@@ -57,6 +57,12 @@ for d in skill_dirs:
               f"skills/{d.name}: description supera 1024 caracteres")
     for ref in re.findall(r"\]\((references/[^)]+)\)", text):
         check((d / ref).is_file(), f"skills/{d.name}: referencia rota {ref}")
+    # Scripts mencionados: se resuelven contra esta skill, salvo que la mención
+    # apunte explícitamente a la carpeta de otra (<carpeta-de-nube-skills-x>/).
+    for owner, script in set(re.findall(r"(?:<carpeta-de-([\w-]+)>/)?(scripts/[\w./-]+\.py)", text)):
+        base = d if owner in ("", "esta-skill", d.name) else skills_dir / owner
+        check((base / script).is_file(),
+              f"skills/{d.name}: script inexistente {base.name}/{script}")
 
 if errors:
     print("VALIDACIÓN FALLÓ:")

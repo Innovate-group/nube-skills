@@ -65,6 +65,8 @@ node_modules/
 3. Verificar que el token quedó protegido: `git check-ignore .nuvem` debe devolver la ruta.
 4. Commit inicial: `chore: kickoff <cliente> — tema base ipanema (installation <ID>)`.
 
+Este commit no es burocracia: es la red de seguridad del proyecto. Es lo que hace que, en el próximo `tiendanube theme pull`, el `git diff` muestre **qué cambió el comerciante desde el editor** — sin git, el pull sobrescribe sin dejar rastro y no hay forma de saberlo.
+
 ## 5. CLAUDE.md del proyecto
 
 Creá `CLAUDE.md` en la raíz con este template completado (es la memoria compartida del proyecto — las skills del plugin lo leen):
@@ -78,6 +80,12 @@ Creá `CLAUDE.md` en la raíz con este template completado (es la memoria compar
 - **Dev loop:** `tiendanube theme watch` (auto-push + navegador con reload)
 - **Regla de fork:** sin fork solo son editables `templates/**`, `custom/**` y
   `config/settings_data.json` — `theme push` omite el resto en silencio.
+- **Sync antes de escribir (aplica a cualquier IA y a cualquier dev):** el comerciante
+  edita `templates/**` y `config/settings_data.json` desde el editor de la tienda.
+  Antes de la primera escritura de cada tarea: commit/stash → `git pull --ff-only` →
+  `tiendanube theme pull` → `git diff`. Lo que traiga el pull y no lo hayas escrito vos
+  es suyo: commitealo aparte antes de editar encima. `theme push` sincroniza
+  eliminaciones, así que una copia vieja no pisa sus cambios: **los borra**.
 
 ## UI-kit
 

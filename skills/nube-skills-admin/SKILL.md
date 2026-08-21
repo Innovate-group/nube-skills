@@ -107,7 +107,7 @@ Y una distinción que hay que hacer siempre antes de rediseñar nada: **un `402`
 **Escritura: cinco tiempos, siempre, sin excepción.** La Admin API **no tiene deshacer ni papelera**.
 
 1. **Dry-run** — `--dry-run` imprime método, URL, headers (token enmascarado) y body sin tocar la red.
-2. **Diff registro por registro** — mostrar valor actual → valor nuevo. Si son 300 registros, mostrar el patrón, el conteo y una muestra representativa, más los casos raros completos.
+2. **Diff registro por registro** — mostrar valor actual → valor nuevo. Si son 300 registros, mostrar el patrón, el conteo y una muestra representativa, más los casos raros completos. El "valor actual" sale de un `GET` **tomado en el momento**, no de una lectura de hace un rato: el comerciante también edita desde el panel, y un `PUT` armado sobre un snapshot viejo revierte en silencio lo que él acaba de cambiar. Si entre la lectura y la confirmación pasó tiempo (o el dev fue a consultar), releé antes de ejecutar.
 3. **Backup a archivo** — `--backup PATH` hace el `GET` previo y guarda el estado actual. Si ese `GET` falla, **la escritura se aborta** (exit 1): sin red de seguridad no se escribe.
 4. **Confirmación explícita del dev** — decir cuántos registros se tocan, qué campos y qué es irreversible. **Frenar y esperar respuesta.** Un "dale" a un plan de 5 registros no autoriza 500.
 5. **Ejecución con reporte** — respetando el rate limit, y cerrando con **aplicados / fallidos / pendientes** y la ruta del backup.

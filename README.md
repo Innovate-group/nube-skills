@@ -30,7 +30,7 @@ claude plugin update nube-skills@nube-skills
 
 | Pieza | Tipo | Estado | Descripción |
 |---|---|---|---|
-| `nube-skills-themes` | skill | ✅ disponible | Contexto completo del modelo sectionable: arquitectura, sections/blocks/snippets, schema, CLI y Fork Workflow, con detección automática de generación de tema (nuevo / clásico / Shopify). |
+| `nube-skills-themes` | skill | ✅ disponible | Contexto completo del modelo sectionable: arquitectura, sections/blocks/snippets, schema, CLI y Fork Workflow, con detección automática de generación de tema (nuevo / clásico / Shopify). Define el **sync gate**: nadie escribe un archivo del tema sin pullear antes. |
 | `nube-skills-section` | skill | ✅ disponible | Construye sections, blocks y componentes: de un nodo de Figma (desktop + mobile) o, sin boceto, dibujando primero un mockup con la skill `design`. Hace triage (configurar / re-estilizar / extender / custom), es settings-first, y genera `.tpl` + `{% schema %}` + traducciones + registro en el JSON template. |
 | `/nube-skills:kickoff` | comando | ✅ disponible | Arranque de un cliente nuevo: instalación Ipanema con el CLI, pull, git con `.nuvem` protegido, y `CLAUDE.md` del proyecto (con el ui-kit que usan las demás skills). |
 | `nube-skills-i18n` | skill | ✅ disponible | Auditoría y alta de claves de traducción: detecta las usadas en el código que faltan en algún locale (el `t:` crudo que aparece en el editor), distingue los dos sistemas (`t:` de schema vs `\| t` de storefront) e incluye un script determinista de auditoría. |
@@ -47,6 +47,8 @@ Un rediseño típico recorre las piezas en este orden. Salvo el kickoff, no hace
 2. **Desarrollo** — le pasás a Claude el nodo de Figma de una sección y `nube-skills-section` decide la intervención mínima (configurar lo que ya existe o construir algo nuevo) y genera el código. Sin boceto, dibuja primero un mockup. `nube-skills-themes` le da el contexto del modelo sectionable a todo lo demás.
 3. **Traducciones** — `nube-skills-i18n` audita que ninguna clave quede a medias entre locales.
 4. **Revisión** — `nube-skills-qa` compara lo implementado contra el diseño en desktop y mobile antes de publicar.
+
+En los cuatro pasos aplica la misma regla, definida en `nube-skills-themes`: **antes de escribir cualquier archivo del tema se sincroniza** (commit/stash → `git pull` → `tiendanube theme pull` → leer el diff). El comerciante edita `templates/**` y `config/settings_data.json` desde el editor de la tienda mientras el equipo trabaja, y `theme push` sincroniza eliminaciones: escribir con una copia vieja no le pisa los cambios, se los borra. La parte verificable la chequea `skills/nube-skills-themes/scripts/sync-check.py`.
 
 ## Requisitos
 

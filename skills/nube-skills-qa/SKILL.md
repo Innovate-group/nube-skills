@@ -118,8 +118,10 @@ Si el dev quiere una comparación visual interactiva (swipe entre diseño e impl
 
 ## Paso 4 — Corregir y re-verificar (si el dev lo pide)
 
+**Antes de la primera corrección, corré el gate del Paso 0.5 de `nube-skills-themes`** (commit/stash → `git pull --ff-only` → `tiendanube theme pull` → `git diff`). El QA se hizo contra la preview, que es el estado **remoto**: tu copia local puede ser más vieja que eso. Si el comerciante configuró algo desde el editor mientras revisabas, "arreglar" settings sobre la copia vieja se lo borra — y `theme push` sincroniza eliminaciones, así que también se van las secciones que él agregó. Si el pull trae cambios, re-mirá los hallazgos: alguno puede haber dejado de existir.
+
 1. **Bugs** → corregilos con las convenciones de `nube-skills-section` (settings-first, tokens antes que valores sueltos). Tocar `sections/`, `blocks/`, `snippets/` o `static/` exige `forked: true`: sin fork el push omite esos archivos en silencio y la preview no va a cambiar — avisá que hace falta `tiendanube theme fork` (hoy figura "Próximamente" en la doc) en vez de dar el arreglo por hecho.
-2. **Settings** → ajustá el JSON template; si lo configuró el comerciante desde el editor, no lo pises: avisalo.
+2. **Settings** → ajustá el JSON template; si lo configuró el comerciante desde el editor, no lo pises: avisalo. El `git diff` del gate es lo que te dice cuál valor es suyo — sin ese pull no podés distinguir "el dev puso 24" de "el comerciante puso 24".
 3. **Re-capturá** los puntos corregidos y mirá la vista completa de nuevo: un arreglo de CSS puede mover otra cosa.
 
 ## Reglas duras
@@ -129,5 +131,6 @@ Si el dev quiere una comparación visual interactiva (swipe entre diseño e impl
 3. **Compará siempre el mismo breakpoint** contra su equivalente.
 4. **Distinguí bug de setting** antes de proponer un arreglo: cambiar CSS para compensar un setting mal puesto empeora el código.
 5. **No toques código durante el Paso 3:** primero el reporte completo, después las correcciones.
-6. **No corras auditorías de performance** desde esta skill — `tiendanube theme performance` ya las cubre.
-7. **No rehagas el checklist estructural de `nube-skills-section`** (schema, claves `t:`, `block_attributes`, existencia de settings): acá se audita lo que se ve renderizado.
+6. **Ninguna corrección sin sincronizar antes** (gate del Paso 0.5 de `nube-skills-themes`): auditás contra el remoto, así que corregir sobre una copia local vieja es la forma más directa de borrar lo que el comerciante configuró mientras hacías el QA.
+7. **No corras auditorías de performance** desde esta skill — `tiendanube theme performance` ya las cubre.
+8. **No rehagas el checklist estructural de `nube-skills-section`** (schema, claves `t:`, `block_attributes`, existencia de settings): acá se audita lo que se ve renderizado.

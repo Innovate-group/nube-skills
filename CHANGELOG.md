@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 — 2026-08-21
+
+- **Sync gate: nadie escribe un archivo del tema sin sincronizar antes.** El comerciante edita `templates/**` y `config/settings_data.json` desde el editor de la tienda mientras el equipo trabaja, y `theme push` **sincroniza eliminaciones**: escribir con una copia local vieja no solo pisa sus valores, borra de la tienda las secciones que él agregó — sin confirmación y sin deshacer. `nube-skills-themes` gana el **Paso 0.5** con el gate (commit/stash → `git pull --ff-only` → `tiendanube theme pull` → leer el diff), la tabla de propiedad compartida de cada archivo y la **regla dura #8**.
+- Nueva referencia [`sync-and-conflicts.md`](skills/nube-skills-themes/references/sync-and-conflicts.md): cómo leer el diff que trae un pull, cómo reconciliar un conflicto (el valor del comerciante gana por default; los conflictos de JSON template no se resuelven a ojo), el **gate extra antes de `theme publish`** (publicar un borrador reemplaza la productiva entera, incluido lo que el comerciante configuró desde que se clonó) y los casos borde: sin git, con `theme watch` corriendo, sin fork, dos instalaciones, FTP legado.
+- Nuevo script `sync-check.py` (Python 3, stdlib): verifica lo determinista del gate — instalación del Fork workflow, antigüedad del último `theme pull`, estado de git (sin commitear / commits pendientes del remoto), `theme watch` activo, `forked`, y en qué capa cae cada archivo a tocar. Exit 0/1/2, `--json` para usarlo desde un hook.
+- El gate queda enganchado en las skills que escriben: `nube-skills-section` (prerrequisito y re-pull antes de tocar el JSON template), `nube-skills-qa` (antes de la primera corrección: el QA se hace contra el remoto, no contra tu copia), `nube-skills-i18n` (`theme pull` sobrescribe los locales). `/nube-skills:kickoff` deja la regla escrita en el `CLAUDE.md` del proyecto, para que la respete cualquier IA y cualquier dev.
+- `nube-skills-admin`: el mismo criterio del lado de la API — el diff y el backup se calculan contra un `GET` tomado en el momento, no contra una lectura vieja. El comerciante también edita desde el panel.
+
 ## 1.2.0 — 2026-08-19
 
 - `/nube-skills:kickoff` ya no pide los bocetos de las páginas: esos se pasan **sección a sección** durante el desarrollo. Ahora pide lo único que sí se necesita desde el arranque, **los nodos del ui-kit** — que no es un boceto sino un conjunto de nodos (colores, tipografías, botones, formularios, cards, iconografía, espaciados/grid).
