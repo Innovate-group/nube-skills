@@ -12,8 +12,9 @@ Protocolo para no pisar el trabajo del comerciante ni el de otro dev al escribir
 6. [Reconciliar un conflicto](#6-reconciliar-un-conflicto)
 7. [El gate antes de publicar](#7-el-gate-antes-de-publicar)
 8. [El script sync-check.py](#8-el-script-sync-checkpy)
-9. [Anti-patrones](#9-anti-patrones)
-10. [Casos borde](#10-casos-borde)
+9. [El hook que lo hace obligatorio](#9-el-hook-que-lo-hace-obligatorio)
+10. [Anti-patrones](#10-anti-patrones)
+11. [Casos borde](#11-casos-borde)
 
 ---
 
@@ -154,11 +155,29 @@ Verifica, sobre el tema indicado (por defecto el directorio actual): que sea una
 
 - Exit **0** = podés escribir · **1** = falta sincronizar (imprime qué y cómo) · **2** = error de uso (la ruta no es un tema del Fork workflow).
 - `--json` emite el mismo informe estructurado, para usarlo desde un hook o un script.
-- `--max-age <minutos>` cambia el umbral de frescura del pull (default 30). `--no-fetch` evita el `git fetch` si no hay red.
+- `--max-age <minutos>` cambia el umbral de frescura del pull (default 15, igual que el hook, o lo que diga `NUBE_SYNC_MAX_AGE_MIN`). `--no-fetch` evita el `git fetch` si no hay red. `--stamp` registra un pull que corriste a mano.
 
 El script **no reemplaza el gate**: no corre el pull por vos ni lee el diff. Dice si podés escribir y, si no, qué falta.
 
-## 9. Anti-patrones
+## 9. El hook que lo hace obligatorio
+
+Esta skill puede no estar cargada, y una instrucción se puede saltear. Por eso el plugin trae un hook (`hooks/hooks.json` + `hooks/sync-gate.py`) que aplica el gate de forma determinista, en toda escritura, sin depender de qué skills haya en contexto:
+
+| Herramienta | Decisión | Condición |
+|---|---|---|
+| `Write` / `Edit` / `NotebookEdit` sobre `templates/**` o `config/settings_data.json` | `deny` | No hay un `theme pull` registrado en los últimos 15 min (`NUBE_SYNC_MAX_AGE_MIN` lo cambia) |
+| `Bash` con `theme push` | `deny` | Ídem — es el comando que sincroniza eliminaciones |
+| `Bash` con `theme publish` | `ask` | Siempre (ver §7) |
+| Cualquier otra cosa | permite en silencio | — |
+
+Si te bloquea, **no es un bug ni un obstáculo a rodear**: el mensaje del bloqueo trae los 4 pasos del gate. Corrélos y reintentá la escritura. Detalles:
+
+- El pull se registra en un marcador por tema (fuera del repo, en `~/.cache/nube-skills/`), no por el mtime de `manifest.json`: push y watch también tocan ese archivo, así que su fecha no prueba que hubo un pull. La primera escritura en un tema nuevo siempre pide el pull.
+- Si el pull lo corrió el dev en su propia terminal, el hook no lo vio: registralo con `python3 <skill>/scripts/sync-check.py <tema> --stamp` en vez de pullear otra vez (un pull de más sobrescribe archivos locales).
+- **Nunca intentes esquivar el bloqueo** por otra herramienta (`Bash` con `sed`/`cat`, otro tool de escritura): protege datos de un tercero que no está en la conversación. Si hay que escribir sin sincronizar, la decisión es del dev, y la ejecuta él con `NUBE_SKIP_SYNC_GATE=1`.
+- El hook es inerte fuera de temas de Tienda Nube y fail-open ante cualquier error interno, así que su ausencia de mensajes no prueba que estés sincronizado: el criterio sigue siendo tuyo.
+
+## 10. Anti-patrones
 
 | Anti-patrón | Por qué duele |
 |---|---|
@@ -170,7 +189,7 @@ El script **no reemplaza el gate**: no corre el pull por vos ni lee el diff. Dic
 | Resolver un conflicto de JSON template a ojo | Genera un estado que nunca existió en la tienda, y el JSON roto no se ve hasta que el editor falla |
 | Trabajar sin git para "ir rápido" | Sin git no hay diff: no podés saber qué cambió el comerciante ni volver atrás (§10) |
 
-## 10. Casos borde
+## 11. Casos borde
 
 **El proyecto no tiene git.** No hay red de seguridad: el pull sobrescribe sin dejar rastro y no hay forma de ver qué cambió el comerciante. Antes de escribir nada: `git init -b main`, `.gitignore` con `.nuvem`, y commit del estado actual (el comando `/nube-skills:kickoff` deja esto listo). No es burocracia: es lo que hace visible el trabajo del otro lado.
 

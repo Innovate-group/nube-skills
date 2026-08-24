@@ -37,6 +37,8 @@ claude plugin update nube-skills@nube-skills
 | `nube-skills-admin` | skill | ✅ disponible | Experto en el backoffice y la Admin API: hace triage de qué se puede por API, qué necesita aprobación de Tienda Nube, qué es solo del panel y qué es imposible; ejecuta lecturas libres y escrituras con dry-run, backup y confirmación explícita. Incluye un cliente HTTP con rate limit y paginación correctos. |
 | `nube-skills-qa` | skill | ✅ disponible | QA visual contra el diseño en desktop y mobile: maneja la preview con el MCP de Chrome DevTools, compara estilos computados (no píxeles a ojo), revisa estados interactivos y reporta hallazgos priorizados separando bugs de código, settings mal configurados y contenido real de la tienda. |
 
+| `sync-gate` | hook | ✅ disponible | Enforcement determinista del sync gate: bloquea escrituras sobre `templates/**` y `config/settings_data.json` (y `theme push`) sin un `theme pull` reciente, y pide confirmación en `theme publish`. Corre siempre, sin depender de qué skills estén cargadas. |
+
 Convención de nombres: toda skill del catálogo se llama `nube-skills-<qué-hace>`; los comandos llevan el namespace del plugin (`/nube-skills:<comando>`).
 
 ## Cómo se encadenan
@@ -49,6 +51,36 @@ Un rediseño típico recorre las piezas en este orden. Salvo el kickoff, no hace
 4. **Revisión** — `nube-skills-qa` compara lo implementado contra el diseño en desktop y mobile antes de publicar.
 
 En los cuatro pasos aplica la misma regla, definida en `nube-skills-themes`: **antes de escribir cualquier archivo del tema se sincroniza** (commit/stash → `git pull` → `tiendanube theme pull` → leer el diff). El comerciante edita `templates/**` y `config/settings_data.json` desde el editor de la tienda mientras el equipo trabaja, y `theme push` sincroniza eliminaciones: escribir con una copia vieja no le pisa los cambios, se los borra. La parte verificable la chequea `skills/nube-skills-themes/scripts/sync-check.py`.
+
+## El sync gate no depende de que la IA se acuerde
+
+Una skill se carga cuando el modelo decide que es relevante, y sus reglas se pueden saltear. Por eso el plugin incluye un **hook** (`hooks/`) que lo hace determinista: corre en toda escritura, sin importar qué skills estén cargadas.
+
+| Qué hace | Cuándo |
+|---|---|
+| **Bloquea** (`deny`) escribir en `templates/**` y `config/settings_data.json` | Cuando no hay un `tiendanube theme pull` registrado en los últimos 15 minutos. El mensaje de bloqueo le dicta a la IA los 4 pasos del gate |
+| **Bloquea** `tiendanube theme push` | Misma condición: es el comando que sincroniza eliminaciones |
+| **Pide confirmación** (`ask`) en `tiendanube theme publish` | Siempre: publicar un borrador reemplaza la instalación productiva entera |
+| **Registra** el pull | Después de cada `theme pull` exitoso (corroborado contra el mtime de `manifest.json`) |
+
+Detalles de diseño, por si hay que auditarlo:
+
+- **Inerte fuera de un tema de Tienda Nube.** Sube por el árbol buscando `.nuvem` o un `manifest.json` que *parsee y tenga campos del CLI* (`installation_id` / `revision_token`), así un `manifest.json` de PWA o de extensión no activa nada.
+- **Fail-open.** Cualquier error interno permite la operación: un hook roto no puede bloquear el trabajo en todos los proyectos.
+- **Solo la capa compartida.** Escribir `sections/`, `blocks/`, `snippets/` o `static/` no se bloquea nunca.
+- **Rápido** (~35 ms) y sin red: solo filesystem.
+- **Escapes, para el dev, no para la IA:** `NUBE_SKIP_SYNC_GATE=1` desactiva el gate; `NUBE_SYNC_MAX_AGE_MIN` cambia la ventana de 15 min; `sync-check.py <tema> --stamp` registra un pull hecho a mano en otra terminal.
+
+**Requisitos y verificación** (el hook viene solo por el plugin — la instalación con `npx skills add` copia skills, no hooks):
+
+```
+claude plugin marketplace update nube-skills
+claude plugin update nube-skills@nube-skills
+```
+
+Reiniciá la sesión (o `/reload-plugins`) y confirmá con `/hooks` que aparecen `PreToolUse` y `PostToolUse` de nube-skills. Si no aparecen: revisá que el plugin esté habilitado, que no haya `disableAllHooks: true` en ningún settings, y que el `.zshrc`/`.bashrc` no imprima nada sin condicionar a shell interactiva (esa salida se mezcla con el JSON del hook y lo invalida).
+
+Para desactivarlo del todo, deshabilitá el plugin o exportá `NUBE_SKIP_SYNC_GATE=1` en tu entorno.
 
 ## Requisitos
 

@@ -65,7 +65,9 @@ python3 <carpeta-de-esta-skill>/scripts/sync-check.py . --files templates/pages/
 
 Exit **0** = podés escribir · **1** = falta sincronizar (imprime los comandos en orden) · **2** = el directorio no es una instalación del Fork workflow. El script no corre el pull ni lee el diff por vos: eso es criterio.
 
-Protocolo completo, cómo leer el diff, reconciliación de conflictos, gate antes de publicar y casos borde: [references/sync-and-conflicts.md](references/sync-and-conflicts.md).
+**Esto no depende de que te acuerdes:** el plugin trae un hook que bloquea (`deny`) toda escritura sobre `templates/**` y `config/settings_data.json` —y todo `theme push`— si no hay un `theme pull` registrado en los últimos 15 minutos, y pide confirmación en `theme publish`. Si te bloquea, el mensaje trae los 4 pasos: corrélos y reintentá. **No busques otra vía para escribir el archivo** (ni `Bash` con `sed`, ni otra herramienta): el bloqueo protege datos de un tercero que no está en la conversación. Y como el hook es fail-open e inerte fuera de temas de Tienda Nube, su silencio no prueba que estés sincronizado: el criterio sigue siendo tuyo.
+
+Protocolo completo, cómo leer el diff, reconciliación de conflictos, gate antes de publicar, detalle del hook y casos borde: [references/sync-and-conflicts.md](references/sync-and-conflicts.md).
 
 ## 4. Arquitectura en una pantalla
 

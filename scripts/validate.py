@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Valida la estructura del repo nube-skills.
 
-Chequea: manifiestos JSON de .claude-plugin/, y para cada skills/<dir>:
+Chequea: manifiestos JSON de .claude-plugin/, la config de hooks/hooks.json
+(estructura y que los scripts que invoca existan), y para cada skills/<dir>:
 SKILL.md presente, frontmatter con name (== carpeta) y description (<=1024),
-y que toda referencia markdown a references/ exista.
+que toda referencia markdown a references/ exista y que los scripts citados
+en el SKILL.md existan.
 Exit 0 si todo OK; exit 1 con listado de errores si no.
 """
 import json
@@ -28,6 +30,34 @@ for rel in (".claude-plugin/plugin.json", ".claude-plugin/marketplace.json"):
             json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             errors.append(f"{rel}: JSON inválido ({exc})")
+
+# hooks/hooks.json: un error acá no rompe nada visiblemente — el hook
+# simplemente no corre, que es el modo de falla más caro de todos.
+hooks_json = ROOT / "hooks" / "hooks.json"
+if hooks_json.is_file():
+    try:
+        conf = json.loads(hooks_json.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        conf = None
+        errors.append(f"hooks/hooks.json: JSON inválido ({exc})")
+    if isinstance(conf, dict):
+        check("hooks" in conf, "hooks/hooks.json: falta la clave raíz 'hooks'")
+        for event, entries in (conf.get("hooks") or {}).items():
+            check(isinstance(entries, list), f"hooks/hooks.json: {event} no es una lista")
+            for entry in entries if isinstance(entries, list) else []:
+                check(bool(entry.get("matcher")), f"hooks/hooks.json: {event} sin matcher")
+                inner = entry.get("hooks")
+                check(isinstance(inner, list) and len(inner) > 0,
+                      f"hooks/hooks.json: {event} sin array 'hooks'")
+                for hook in inner if isinstance(inner, list) else []:
+                    check(hook.get("type") == "command",
+                          f"hooks/hooks.json: {event} con type != command")
+                    cmd = hook.get("command", "")
+                    for script in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/([\w./-]+)", cmd):
+                        check((ROOT / script).is_file(),
+                              f"hooks/hooks.json: el comando apunta a {script}, que no existe")
+    elif conf is not None:
+        errors.append("hooks/hooks.json: la raíz no es un objeto")
 
 skills_dir = ROOT / "skills"
 check(skills_dir.is_dir(), "falta el directorio skills/")

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0 — 2026-08-24
+
+- **El sync gate deja de ser una instrucción y pasa a ser un hook.** La v1.3.0 documentaba el gate en las skills, y eso no alcanzó: una skill se carga solo cuando el modelo la considera relevante, y sus reglas se pueden saltear — con el resultado de JSONs editados antes del pull y settings del comerciante pisadas. Ahora `hooks/hooks.json` + `hooks/sync-gate.py` lo aplican en **toda** escritura, sin depender de qué skills haya en contexto.
+- Qué hace el hook: **`deny`** en `Write`/`Edit`/`NotebookEdit` sobre `templates/**` y `config/settings_data.json`, y en `Bash` con `theme push`, cuando no hay un `theme pull` registrado en los últimos 15 minutos — el mensaje de bloqueo le dicta a la IA los 4 pasos del gate; **`ask`** en `theme publish` (reemplaza la instalación productiva entera); y registra el pull después de cada `theme pull` exitoso.
+- El registro del pull vive en un marcador por tema (`~/.cache/nube-skills/`, fuera del repo del cliente) y **no** en el mtime de `manifest.json`: push y watch también tocan ese archivo, así que su fecha no prueba que hubo un pull. `sync-check.py <tema> --stamp` registra un pull hecho a mano en otra terminal.
+- Diseñado para no molestar donde no corresponde: **inerte** fuera de un tema de Tienda Nube (exige `.nuvem` o un `manifest.json` que parsee y tenga campos del CLI, así un manifest de PWA o de extensión no dispara nada), **fail-open** ante cualquier error interno, solo bloquea la capa compartida con el comerciante (nunca `sections/`, `blocks/`, `snippets/`, `static/`), ~35 ms por invocación y sin red.
+- Escapes en manos del dev, no del modelo: `NUBE_SKIP_SYNC_GATE=1` desactiva el gate y `NUBE_SYNC_MAX_AGE_MIN` cambia la ventana.
+- `validate.py` ahora valida `hooks/hooks.json` (estructura y que los scripts que invoca existan): un hook mal configurado no falla ruidosamente, simplemente no corre, y ese es el modo de falla más caro.
+- Requiere actualizar el plugin y **reiniciar la sesión** (o `/reload-plugins`); verificalo con `/hooks`. La instalación vía `npx skills add` copia skills, no hooks.
+
 ## 1.3.0 — 2026-08-21
 
 - **Sync gate: nadie escribe un archivo del tema sin sincronizar antes.** El comerciante edita `templates/**` y `config/settings_data.json` desde el editor de la tienda mientras el equipo trabaja, y `theme push` **sincroniza eliminaciones**: escribir con una copia local vieja no solo pisa sus valores, borra de la tienda las secciones que él agregó — sin confirmación y sin deshacer. `nube-skills-themes` gana el **Paso 0.5** con el gate (commit/stash → `git pull --ff-only` → `tiendanube theme pull` → leer el diff), la tabla de propiedad compartida de cada archivo y la **regla dura #8**.

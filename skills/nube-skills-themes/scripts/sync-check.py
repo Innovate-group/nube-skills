@@ -7,7 +7,8 @@ cambios: `theme push` sincroniza eliminaciones, así que borra lo que él agreg�
 Este script verifica lo determinista del gate previo a escribir:
 
   - que el directorio sea una instalación bajada con el CLI (Fork workflow),
-  - la antigüedad del último `theme pull` (mtime de manifest.json),
+  - que haya un `theme pull` reciente y REGISTRADO (mismo criterio que el hook:
+    el mtime de manifest.json no cuenta, porque push y watch también lo tocan),
   - el estado de git (repo, archivos sin commitear, commits pendientes del remoto),
   - si hay un `theme watch` corriendo (hay que cortarlo antes de pullear),
   - el estado de `forked`,
@@ -18,16 +19,22 @@ No corre el pull ni lee el diff: dice si podés escribir y, si no, qué falta.
 Uso:
   python3 sync-check.py [ruta-del-tema] [--files a b c] [--max-age MIN]
                         [--no-fetch] [--json]
+  python3 sync-check.py [ruta-del-tema] --stamp    # registrar un pull hecho a mano
 
 Exit codes: 0 = podés escribir · 1 = falta sincronizar · 2 = error de uso.
 """
 import argparse
+import hashlib
 import json
 import os
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+# Dónde se registra cada `theme pull` observado. Fuera del tema, para no ensuciar
+# el repo del cliente (un archivo untracked aparecería como "sin commitear").
+CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")) / "nube-skills"
 
 # Capas de propiedad de los archivos del tema. El orden importa: primer match gana.
 LAYERS = [
@@ -47,6 +54,14 @@ LAYERS = [
 ]
 
 
+def default_max_age():
+    """Misma ventana que el hook: 15 min, o NUBE_SYNC_MAX_AGE_MIN si está seteada."""
+    try:
+        return int(os.environ.get("NUBE_SYNC_MAX_AGE_MIN", 15))
+    except ValueError:
+        return 15
+
+
 def run(cmd, cwd, timeout=20):
     """Corre un comando y devuelve (ok, stdout). Nunca levanta excepción."""
     try:
@@ -55,6 +70,71 @@ def run(cmd, cwd, timeout=20):
         return p.returncode == 0, (p.stdout or "").strip()
     except (OSError, subprocess.SubprocessError):
         return False, ""
+
+
+def is_theme_manifest(path):
+    """True solo si `manifest.json` es el de una instalación de Tienda Nube.
+
+    `manifest.json` es un nombre común (PWAs, extensiones de navegador, etc.):
+    sin mirar el contenido, cualquier proyecto con ese archivo y una carpeta
+    `templates/` parecería un tema y quedaría bajo el gate.
+    """
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    return bool({"installation_id", "revision_token"} & set(data)) or (
+        "theme" in data and "theme_version" in data)
+
+
+def find_theme_root(start, levels=8):
+    """Sube desde `start` buscando la raíz de la instalación (.nuvem o manifest del CLI)."""
+    p = Path(start).expanduser()
+    try:
+        p = p.resolve()
+    except OSError:
+        return None
+    if p.is_file() or p.suffix:
+        p = p.parent
+    for _ in range(levels):
+        if (p / ".nuvem").is_file() or is_theme_manifest(p / "manifest.json"):
+            return p
+        if p.parent == p:
+            break
+        p = p.parent
+    return None
+
+
+def marker_path(theme):
+    """Marcador de último `theme pull` de ESTE tema (una ruta = un marcador)."""
+    h = hashlib.sha256(str(Path(theme).resolve()).encode("utf-8")).hexdigest()[:16]
+    return CACHE_DIR / f"last-pull-{h}"
+
+
+def stamp_pull(theme):
+    mp = marker_path(theme)
+    mp.parent.mkdir(parents=True, exist_ok=True)
+    mp.write_text(f"{int(time.time())} {theme}\n", encoding="utf-8")
+    return mp
+
+
+def sync_age_minutes(theme):
+    """(minutos desde el último pull conocido, fuente).
+
+    El marcador manda sobre `manifest.json`: el mtime del manifest también se
+    mueve con push/watch, así que no prueba que hubo un pull. Sin marcador
+    (primera vez en este tema) se usa el manifest como bootstrap, y quien
+    decide qué hacer con una señal débil es el llamador.
+    """
+    mp = marker_path(theme)
+    if mp.is_file():
+        return int((time.time() - mp.stat().st_mtime) // 60), "marcador de pull"
+    man = Path(theme) / "manifest.json"
+    if man.is_file():
+        return int((time.time() - man.stat().st_mtime) // 60), "mtime de manifest.json"
+    return None, None
 
 
 def classify(rel_path):
@@ -112,10 +192,13 @@ def main():
     ap.add_argument("theme", nargs="?", default=".", help="ruta del tema (default: directorio actual)")
     ap.add_argument("--files", nargs="*", default=[],
                     help="archivos que se van a escribir, para clasificar su capa")
-    ap.add_argument("--max-age", type=int, default=30,
-                    help="minutos de antigüedad tolerada del último theme pull (default 30)")
+    ap.add_argument("--max-age", type=int, default=default_max_age(),
+                    help="minutos de antigüedad tolerada del último theme pull "
+                         "(default 15, o NUBE_SYNC_MAX_AGE_MIN)")
     ap.add_argument("--no-fetch", action="store_true", help="no correr git fetch")
     ap.add_argument("--json", action="store_true", dest="as_json", help="salida JSON")
+    ap.add_argument("--stamp", action="store_true",
+                    help="registrar que acabás de correr `theme pull` a mano (y salir)")
     args = ap.parse_args()
 
     theme = Path(args.theme).expanduser().resolve()
@@ -132,8 +215,13 @@ def main():
               file=sys.stderr)
         return 2
 
+    if args.stamp:
+        mp = stamp_pull(theme)
+        print(f"Registrado: `theme pull` de {theme}\nMarcador: {mp}")
+        return 0
+
     report = {"theme": str(theme), "blockers": [], "warnings": [], "commands": []}
-    need = {"init": False, "commit": False, "gitpull": False}
+    need = {"init": False, "commit": False, "gitpull": False, "stamp": False}
 
     # --- instalación -------------------------------------------------------
     manifest = {}
@@ -149,12 +237,18 @@ def main():
     report["revision_token"] = (rev[:12] + "…") if isinstance(rev, str) and len(rev) > 12 else rev
 
     # --- frescura del último pull ------------------------------------------
-    age_min = None
-    if manifest_path.is_file():
-        age_min = int((time.time() - manifest_path.stat().st_mtime) // 60)
+    age_min, age_src = sync_age_minutes(theme)
     report["last_pull_minutes"] = age_min
+    report["last_pull_source"] = age_src
+    # Mismo criterio que el hook (hooks/sync-gate.py), para que nunca se
+    # contradigan: solo el marcador de un pull observado cuenta como sincronía.
     if age_min is None:
         report["blockers"].append("no hay manifest.json: no se sabe de qué revisión viene esta copia")
+    elif age_src != "marcador de pull":
+        report["blockers"].append(
+            "no hay marcador de pull para este tema: el mtime de `manifest.json` es una señal "
+            "débil (push y watch también lo tocan, así que no prueba que hubo pull)")
+        need["stamp"] = True
     elif age_min > args.max_age:
         report["blockers"].append(
             f"el último `theme pull` fue hace ~{age_min} min (umbral {args.max_age}): "
@@ -229,6 +323,9 @@ def main():
         if w:
             cmds.append("# cortá el `theme watch` antes de seguir")
         cmds.append("tiendanube theme pull")
+        if need["stamp"]:
+            cmds.append(f"# (si el pull ya lo corriste a mano: python3 {Path(__file__).name} "
+                        f"{theme} --stamp — evita un pull de más, que sobrescribe archivos locales)")
         cmds.append("git status && git diff    # lo que aparezca y no escribiste vos ES del comerciante")
         report["commands"] = cmds
     report["verdict"] = "PULL REQUERIDO" if report["blockers"] else "OK PARA ESCRIBIR"
@@ -241,7 +338,7 @@ def main():
     print(f"Tema: {theme}")
     inst = report["installation_id"] or "?"
     fork_txt = {True: "con fork", False: "sin fork", None: "fork desconocido"}[report["forked"]]
-    age_txt = f"hace ~{age_min} min" if age_min is not None else "desconocido"
+    age_txt = f"hace ~{age_min} min (según {age_src})" if age_min is not None else "desconocido"
     print(f"Instalación {inst} · {fork_txt} · tema {report['theme_version'] or '?'} "
           f"· revisión {report['revision_token'] or '?'}")
     print(f"Último `theme pull`: {age_txt}")
