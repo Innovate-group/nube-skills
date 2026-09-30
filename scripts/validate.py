@@ -5,7 +5,9 @@ Chequea: manifiestos JSON de .claude-plugin/, la config de hooks/hooks.json
 (estructura y que los scripts que invoca existan), y para cada skills/<dir>:
 SKILL.md presente, frontmatter con name (== carpeta) y description (<=1024),
 que toda referencia markdown a references/ exista y que los scripts citados
-en el SKILL.md existan.
+en el SKILL.md existan. Además, los links relativos de docs/handoff/ (sin
+plantillas/) y que las rutas ${CLAUDE_PLUGIN_ROOT}/... citadas en
+commands/*.md existan.
 Exit 0 si todo OK; exit 1 con listado de errores si no.
 """
 import json
@@ -93,6 +95,34 @@ for d in skill_dirs:
         base = d if owner in ("", "esta-skill", d.name) else skills_dir / owner
         check((base / script).is_file(),
               f"skills/{d.name}: script inexistente {base.name}/{script}")
+
+# docs/handoff/: un link roto en el índice no da ningún error visible, solo deja al
+# lector sin el capítulo. Se chequean los links relativos a otros archivos (las anclas
+# no). Las plantillas se saltean: sus links son relativos al proyecto donde se copian.
+handoff_dir = ROOT / "docs" / "handoff"
+if handoff_dir.is_dir():
+    for md in sorted(handoff_dir.rglob("*.md")):
+        if "plantillas" in md.relative_to(handoff_dir).parts:
+            continue
+        text = md.read_text(encoding="utf-8")
+        text = re.sub(r"```.*?```", "", text, flags=re.S)  # bloques de código
+        text = re.sub(r"`[^`\n]*`", "", text)  # código inline
+        for target in re.findall(r"\]\(([^)\s]+)\)", text):
+            if target.startswith("#") or re.match(r"^[a-z][a-z0-9+.-]*:", target):
+                continue  # ancla del mismo archivo o URL externa (https:, mailto:)
+            path = target.split("#", 1)[0]
+            check((md.parent / path).exists(),
+                  f"{md.relative_to(ROOT)}: link roto {target}")
+
+# commands/*.md: una ruta ${CLAUDE_PLUGIN_ROOT}/... que no existe recién falla cuando un
+# dev corre el comando en un proyecto de verdad.
+commands_dir = ROOT / "commands"
+for cmd in sorted(commands_dir.glob("*.md")) if commands_dir.is_dir() else []:
+    text = cmd.read_text(encoding="utf-8")
+    for rel in sorted(set(re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/([\w./-]+)", text))):
+        rel = rel.rstrip(".")
+        check((ROOT / rel).exists(),
+              f"commands/{cmd.name}: ruta inexistente ${{CLAUDE_PLUGIN_ROOT}}/{rel}")
 
 if errors:
     print("VALIDACIÓN FALLÓ:")
