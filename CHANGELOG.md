@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-09-30
+
+- **El handoff de Ipanema pasa a vivir en el plugin.** [`docs/handoff/`](docs/handoff/README.md) junta lo aprendido en María Cher (con sus tiendas de Chile y Uruguay), Garçon García y VZ. El `HANDOFF-IPANEMA.md` que se venía copiando a mano entre proyectos quedó congelado el 2026-09-03, y lo aprendido después vivía repartido en el `CLAUDE.md` de cada proyecto. Ahora son 16 capítulos por tema (arranque, skills, sync y reglas, diseño y ui-kit, CLI, schema, Twig, plataforma, producto y carrito, CSS, JS, plantillas, límites y Admin API, patrones, verificación, multi-país) más plantillas del `CLAUDE.md` del proyecto, del `ui-kit.md` y de una skill de ui-kit por proyecto. Lectura obligatoria: `README` + `01`–`03`.
+- **`/nube-skills:kickoff` copia el handoff al proyecto** (`.docs/handoff/`, desde `${CLAUDE_PLUGIN_ROOT}`) y arma `.claude/CLAUDE.md` desde la plantilla. La copia es una foto del día del kickoff: no se edita ni se refresca, y los proyectos que ya arrancaron no la reciben.
+- **El kickoff se alinea con la práctica:** pide la fuente de diseño (Figma, prototipo HTML o ninguna), quién pushea, si se forkea, locales, tiendas hermanas y dominio; usa `tiendanube` y nunca `nuvemshop` (manda `region=br`); crea el `.gitignore` antes de bajar nada; corre `theme list` primero y `theme pull -y`, y verifica que el pull bajó completo; el fork lo corre el dev (ya no figura "Próximamente"); registra líneas de base (schemas, faltantes de i18n, archivos en el servidor); hace dos commits (tema base y documentación), y el agente ya no levanta `theme watch`. El `CLAUDE.md` deja de ir en la raíz.
+- `validate.py` chequea que los links del handoff apunten a archivos que existen y que toda ruta `${CLAUDE_PLUGIN_ROOT}/…` de un comando exista en el repo.
+- Las skills y el hook no cambian: sus problemas conocidos quedan documentados en `docs/handoff/02-skills.md`, cada uno con cómo esquivarlo.
+
 ## 1.4.0 — 2026-08-24
 
 - **El sync gate deja de ser una instrucción y pasa a ser un hook.** La v1.3.0 documentaba el gate en las skills, y eso no alcanzó: una skill se carga solo cuando el modelo la considera relevante, y sus reglas se pueden saltear — con el resultado de JSONs editados antes del pull y settings del comerciante pisadas. Ahora `hooks/hooks.json` + `hooks/sync-gate.py` lo aplican en **toda** escritura, sin depender de qué skills haya en contexto.
